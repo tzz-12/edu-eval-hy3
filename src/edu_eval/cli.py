@@ -1,0 +1,65 @@
+"""命令行入口：edu-eval <文件> [--grade ...] [--json] [--mock]"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+
+from .config import Hy3Config
+from .eval import dimensions as D
+from .eval.knowledge_base import KnowledgeBase
+from .eval.run_eval import EvalContext, evaluate
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="edu-eval",
+        description="EduEval —— 基于混元 Hy3 的初中数学教学设计质量评估器（个人/活动作品）。",
+    )
+    p.add_argument("path", help="待评估文件（.md/.txt/.docx/.pdf/.pptx）")
+    p.add_argument("--grade", help="声明目标年级，例如 七年级")
+    p.add_argument("--version", help="声明教材版本，例如 人教版")
+    p.add_argument("--topic", help="声明课题，例如 一元一次方程")
+    p.add_argument("--period", help="声明课时，例如 1课时")
+    p.add_argument("--kb", help="知识库 JSONL 路径（可选）")
+    p.add_argument("--json", action="store_true", help="以 JSON 形式输出结果")
+    p.add_argument("--mock", action="store_true", help="演示模式：不连接 Hy3，返回占位结果")
+    p.add_argument("--out", help="将报告写入该路径（.txt 或 .json）")
+    return p
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    D.validate_weights()
+
+    if args.mock:
+        os.environ["HY3_MOCK"] = "1"
+    cfg = Hy3Config.from_env(require_key=not args.mock)
+
+    kb = KnowledgeBase.load(args.kb) if args.kb else KnowledgeBase([])
+    ctx = EvalContext(grade=args.grade or "", version=args.version or "",
+                      topic=args.topic or "", period=args.period or "")
+
+    if not os.path.exists(args.path):
+        print(f"文件不存在：{args.path}", file=sys.stderr)
+        return 2
+
+    report = evaluate(args.path, cfg, ctx, kb)
+
+    if args.json:
+        out = json.dumps(report.to_dict(), ensure_ascii=False, indent=2)
+    else:
+        out = report.to_text()
+
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(out)
+        print(f"报告已写入：{args.out}")
+    else:
+        print(out)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
