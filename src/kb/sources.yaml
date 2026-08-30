@@ -1,0 +1,64 @@
+# 知识库来源与许可清单
+# 每个来源必须携带：license / version / retrieved_at / scope / constraints
+# 由 src/kb/schema.py 的校验逻辑配套使用：所有入库条目强制引用本清单中的来源 id。
+
+sources:
+  - id: k12-kgraph
+    name: K12-KGraph 数学学科知识图谱
+    url: https://github.com/OwlPDF/k12-kgraph
+    license: CC BY-NC-SA 4.0
+    version: "snapshot-2025 (math: 2711 nodes / 5273 edges; 初中 Concept 451)"
+    retrieved_at: "2026-08-28"
+    local_path: data/raw/k12_math.json   # 已 gitignore，不入仓库
+    scope:
+      - Tier 1 概念索引（初中 451 Concept，definition/importance 填充率 100%）
+      - 概念→年级册次映射（appears_in → Section → is_part_of → Chapter → Book）
+      - 前置知识关系（prerequisites_for，维度 7 依据）
+    constraints:
+      - "BY：使用时须署名 K12-KGraph"
+      - "NC：仅非商业用途（本课题为教学评测研究，符合）"
+      - "SA：衍生数据须以相同许可共享（Tier 1 导出文件标注同许可）"
+      - 原始 JSON 不重新分发（data/raw/ 已加入 .gitignore）
+    redistribution: 原始文件不重发；仅发布经转换的衍生条目并标注本许可
+
+  - id: curriculum-2022
+    name: 义务教育数学课程标准（2022 年版）
+    url: http://www.moe.gov.cn/srcsite/A26/s8001/202204/t20220420_621919.html
+    license: 政府公开文件（引用不构成版权问题，注明出处）
+    version: "2022 年版（教育部制定，北京师范大学出版社）"
+    retrieved_at: "2026-08-28"
+    local_path: data/raw/math_curriculum_2022.pdf   # 扫描原件已 gitignore
+    derived: data/raw/curriculum_junior.txt         # OCR 文本（仅初中第四学段）
+    scope:
+      - 维度认知层次依据（了解/理解/掌握/运用）
+      - 内容要求/学业要求/教学提示（Tier 2 断言的 std_ref）
+      - 维度 7 学情分析与维度 9 启发式的课标依据
+    constraints:
+      - OCR 文本中公式存在失真（如 (a+b)(a-b)=a²-b² 被识别为「（a+B）（a一B）=Q' B」）
+      - 公式一律不取自 OCR；仅使用其语义内容
+      - 引用时注明「义务教育数学课程标准（2022年版）」及页码
+
+  - id: jpk-indicators
+    name: 教育部「基础教育精品课」评审指标体系
+    url: https://basic.smartedu.cn
+    license: 政府公开文件（注明出处）
+    version: "学科课程类指标（2021）"
+    retrieved_at: "2026-08-28"
+    local_path: data/raw/jpk_indicators.docx   # 已 gitignore
+    scope:
+      - 8 加权维度的设计依据（目标/内容/环节/方法/设计/作业）
+    constraints:
+      - 指标为评审性框架，不直接入库；仅作为维度定义的外部效度来源
+
+  - id: hy3-generated
+    name: Hy3 大模型生成（待定稿，经人工抽检）
+    url: https://cloud.tencent.com/product/hunyuan
+    license: 本项目自有（MIT，随仓库发布）
+    version: "Phase 1（依赖 Hy3 Key）"
+    retrieved_at: null
+    scope:
+      - Tier 2 断言草稿（13 课题核心断言，经 sympy 校验 + 人工抽检）
+      - Tier 1 aliases 定向补充（覆盖率 12.2% → 目标 ≥60%）
+    constraints:
+      - 仅 verified 条目参与 G0 判定
+      - 生成时 temperature=0，且逐条留存 prompt 版本与校验记录

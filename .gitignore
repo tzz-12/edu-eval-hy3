@@ -2,6 +2,8 @@
 .env
 .env.*
 *.local
+# 例外：配置样例模板需入库（README 要求用户 cp .env.example .env）
+!.env.example
 
 # Python
 __pycache__/
@@ -13,8 +15,17 @@ dist/
 .venv/
 venv/
 
-# 运行产物
-results/
+# 原始下载资料：体积大且部分受许可约束（如 K12-KGraph CC BY-NC-SA），
+# 不入库；来源与许可索引见 docs/sources_inventory.md
+data/raw/
+
+# 知识库衍生产物（K12-KGraph 为 CC BY-NC-SA，避免与仓库 MIT 冲突）：
+# 一键重建：python src/kb/ingest.py && python src/kb/grade_map.py
+data/kb/
+
+# 运行产物（注：results/ 需入库，§5.3 要求交付完整结果表格）
+results/.cache/
+results/tmp/
 *.log
 .DS_Store
 .idea/
