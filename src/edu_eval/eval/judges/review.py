@@ -15,7 +15,8 @@ class ReviewJudge(BaseJudge):
     )
 
     def build_user_prompt(self, text: str, context: Dict[str, Any],
-                          kb_context: str = "") -> str:
+                          kb_context: str = "",
+                          rule_evidence: str = "") -> str:
         # 复核走结构化检查为主，LLM 为辅；此处提供统一校验说明
         return (
             f"【待核对原文】\n{text[:6000]}\n\n"

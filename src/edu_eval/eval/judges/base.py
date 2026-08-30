@@ -19,18 +19,21 @@ class BaseJudge:
 
     # 子类覆写：构建 user prompt
     def build_user_prompt(self, text: str, context: Dict[str, Any],
-                          kb_context: str = "") -> str:
+                          kb_context: str = "", rule_evidence: str = "") -> str:
         raise NotImplementedError
 
     def run(self, text: str, context: Dict[str, Any],
-            kb_context: str = "") -> Dict[str, Any]:
-        """执行判定（带缓存与 JSON 解析兜底）。"""
+            kb_context: str = "", rule_evidence: str = "") -> Dict[str, Any]:
+        """执行判定（带缓存与 JSON 解析兜底）。
+
+        rule_evidence：规则层（零 LLM）的确定性判定，作为硬证据注入提示。
+        """
         key = cache_key(text, self.role, self.client.cfg.temperature,
-                        self.client.cfg.model)
+                        self.client.cfg.model, rule_evidence)
         if self.cache and self.cache.get(key):
             return self.cache.get(key)
 
-        user = self.build_user_prompt(text, context, kb_context)
+        user = self.build_user_prompt(text, context, kb_context, rule_evidence)
         raw = self.client.judge(self.system, user)
         data = self._parse_json(raw)
         data["_meta"] = {"role": self.role, "prompt_version": PROMPT_VERSION}

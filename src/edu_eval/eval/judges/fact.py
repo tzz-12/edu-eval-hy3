@@ -19,7 +19,7 @@ class FactJudge(BaseJudge):
     )
 
     def build_user_prompt(self, text: str, context: Dict[str, Any],
-                          kb_context: str = "") -> str:
+                          kb_context: str = "", rule_evidence: str = "") -> str:
         lines = []
         for did in D.JUDGE_GROUPS["fact"]:
             dim = D.get_dimension(did)
@@ -29,9 +29,19 @@ class FactJudge(BaseJudge):
             )
         meta = self._meta(context)
         kb_block = f"\n\n【本地知识库检索结果】\n{kb_context}\n" if kb_context else ""
+        rule_block = (
+            "\n\n【规则层确定性判定（程序计算，非模型推断，优先级最高）】\n"
+            f"{rule_evidence}\n"
+            "以上判定由符号计算与查表得出，除非你能指出其计算或依据有误，"
+            "否则必须采纳：\n"
+            "- 判定为超纲的概念 → 维度 3（学段适配）不得高于 2 分，"
+            "并在 evidence 中引用该概念；\n"
+            "- 判定为豁免/联想的概念 → 不构成超纲依据，不得据此扣分。\n"
+        ) if rule_evidence else ""
         return (
             f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
-            f"【需要评分的维度与量规】\n" + "\n\n".join(lines) + kb_block +
+            f"【需要评分的维度与量规】\n" + "\n\n".join(lines)
+            + rule_block + kb_block +
             "\n\n请返回严格 JSON：\n"
             "{\"admission\":\"PASS|FAIL|NE\",\"redline\":bool,"
             "\"scores\":{\"<维度id>\":{\"score\":1-5,\"evidence\":\"原文片段\",\"ne\":bool}},"

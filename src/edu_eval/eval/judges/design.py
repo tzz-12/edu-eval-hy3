@@ -16,7 +16,8 @@ class DesignJudge(BaseJudge):
     )
 
     def build_user_prompt(self, text: str, context: Dict[str, Any],
-                          kb_context: str = "") -> str:
+                          kb_context: str = "",
+                          rule_evidence: str = "") -> str:
         lines = []
         for did in D.JUDGE_GROUPS["design"]:
             dim = D.get_dimension(did)

@@ -73,10 +73,12 @@ class Orchestrator:
             return report
 
         # 1) 规则层（确定性，零 LLM）
-        concept_ids = self._match_concepts(text)
+        # 注意：不传 concept_ids —— 让规则层自行把概念分为「文本显式出现」
+        # 与「检索联想」两级，前者越界判 FAIL、后者判 WARN。若在此处把
+        # 检索结果一律传入，会全部落到宽松档，显式超纲将漏判。
         rule_rep = self.rules.evaluate(
             text, declared_grade=context.get("grade", ""),
-            concept_ids=concept_ids)
+            retriever=self.retriever)
         report["rules"] = {
             "g0_rule_verdict": rule_rep["g0_rule_verdict"],
             "summary": rule_rep["summary"],
@@ -95,8 +97,12 @@ class Orchestrator:
             return report
 
         # 3) 事实 Judge（G0 + 维度 3）
+        #    规则层的确定性判定作为硬证据注入，否则维度 3 完全依赖 LLM，
+        #    规则层已算出的超纲结论被浪费。
         kb_context = self._kb_context(text)
-        fact = self.j_fact.run(text, context, kb_context=kb_context)
+        rule_evidence = self._format_rule_evidence(rule_rep)
+        fact = self.j_fact.run(text, context, kb_context=kb_context,
+                              rule_evidence=rule_evidence)
         fact = self.j_fact.normalize(fact)
         report["kb_hits"] = self.kb.entries and len(self.kb.retrieve(text, top_k=5)) or 0
         admission = fact.get("admission", "PASS")
@@ -166,6 +172,32 @@ class Orchestrator:
             return [h.id for h in hits]
         except Exception:
             return []
+
+    @staticmethod
+    def _format_rule_evidence(rule_rep: dict) -> str:
+        """把规则层 findings 渲染为给 Judge 的硬证据文本。
+
+        只输出有信息量的项：显式/联想的年级判定、公式核验、豁免留痕。
+        纯 pass 与空判定不占用提示预算。
+        """
+        lines = []
+        for f in rule_rep.get("findings", []):
+            rid, verdict, ev = (f.get("rule_id", ""), f.get("verdict", ""),
+                                (f.get("evidence") or "").strip())
+            if rid.startswith("R-GRADE"):
+                if rid == "R-GRADE-EXPL" and verdict == "fail":
+                    lines.append(f"- 超纲（概念在原文中显式出现）：{ev}")
+                elif rid == "R-GRADE-EXPL" and verdict == "pass":
+                    lines.append("- 原文显式出现的概念均在声明年级范围内")
+                elif rid == "R-GRADE-ASSOC" and verdict == "warn":
+                    lines.append(f"- 疑似超纲（仅由检索联想，原文未直接出现）：{ev}")
+                elif rid == "R-GRADE-EXEMPT":
+                    lines.append(f"- 豁免（图谱收录偏差，不作为超纲依据）：{ev}")
+                elif rid == "R-GRADE" and verdict == "ne":
+                    lines.append(f"- 年级判定不可用：{ev}")
+            elif rid == "R-FORMULA" and verdict == "pass":
+                lines.append(f"- 公式核验通过：{ev}")
+        return "\n".join(lines)
 
     def _kb_context(self, text: str) -> str:
         if not self.kb.entries:

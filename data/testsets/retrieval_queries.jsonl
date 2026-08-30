@@ -1,0 +1,138 @@
+{"query": "有理数", "kind": "name", "expected_ids": ["math_7a_rjb_cpt6"], "selfcheck_actual": "math_7a_rjb_cpt6"}
+{"query": "有理数的加法", "kind": "name", "expected_ids": ["math_7a_rjb_cpt13"], "selfcheck_actual": "math_7a_rjb_cpt13"}
+{"query": "绝对值", "kind": "name", "expected_ids": ["math_7a_rjb_cpt11"], "selfcheck_actual": "math_7a_rjb_cpt11"}
+{"query": "数轴", "kind": "name", "expected_ids": ["math_7a_rjb_cpt8"], "selfcheck_actual": "math_7a_rjb_cpt8"}
+{"query": "相反数", "kind": "name", "expected_ids": ["math_7a_rjb_cpt10"], "selfcheck_actual": "math_7a_rjb_cpt10"}
+{"query": "整式", "kind": "name", "expected_ids": ["math_7a_rjb_cpt37"], "selfcheck_actual": "math_7a_rjb_cpt37"}
+{"query": "同类项", "kind": "name", "expected_ids": ["math_7a_rjb_cpt38"], "selfcheck_actual": "math_7a_rjb_cpt38"}
+{"query": "合并同类项", "kind": "name", "expected_ids": ["math_7a_rjb_cpt39"], "selfcheck_actual": "math_7a_rjb_cpt39"}
+{"query": "一元一次方程", "kind": "name", "expected_ids": ["math_7a_rjb_cpt41"], "selfcheck_actual": "math_7a_rjb_cpt41"}
+{"query": "等式的性质", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_7a_rjb_cpt45"}
+{"query": "移项", "kind": "name", "expected_ids": ["math_7a_rjb_cpt47"], "selfcheck_actual": "math_7a_rjb_cpt47"}
+{"query": "二元一次方程组", "kind": "name", "expected_ids": ["math_7b_rjb_cpt45"], "selfcheck_actual": "math_7b_rjb_cpt45"}
+{"query": "代入消元法", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_7b_rjb_cpt54"}
+{"query": "加减消元法", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_7b_rjb_cpt54"}
+{"query": "全等三角形", "kind": "name", "expected_ids": ["math_8a_rjb_cpt24"], "selfcheck_actual": "math_8a_rjb_cpt24"}
+{"query": "全等三角形的判定", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_8a_rjb_cpt24"}
+{"query": "因式分解", "kind": "name", "expected_ids": ["math_8a_rjb_cpt59"], "selfcheck_actual": "math_8a_rjb_cpt59"}
+{"query": "提公因式法", "kind": "name", "expected_ids": ["math_8a_rjb_cpt61"], "selfcheck_actual": "math_8a_rjb_cpt61"}
+{"query": "公式法", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_9a_rjb_cpt14"}
+{"query": "分式", "kind": "name", "expected_ids": ["math_8a_rjb_cpt63"], "selfcheck_actual": "math_8a_rjb_cpt63"}
+{"query": "分式的基本性质", "kind": "name", "expected_ids": ["math_8a_rjb_cpt65"], "selfcheck_actual": "math_8a_rjb_cpt65"}
+{"query": "通分", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_8a_rjb_cpt68"}
+{"query": "勾股定理", "kind": "name", "expected_ids": ["math_8b_rjb_cpt11"], "selfcheck_actual": "math_8b_rjb_cpt11"}
+{"query": "勾股定理的逆定理", "kind": "name", "expected_ids": ["math_8b_rjb_cpt14"], "selfcheck_actual": "math_8b_rjb_cpt14"}
+{"query": "一次函数", "kind": "name", "expected_ids": ["math_8b_rjb_cpt50"], "selfcheck_actual": "math_8b_rjb_cpt50"}
+{"query": "正比例函数", "kind": "name", "expected_ids": ["math_8b_rjb_cpt48"], "selfcheck_actual": "math_8b_rjb_cpt48"}
+{"query": "待定系数法", "kind": "name", "expected_ids": [], "selfcheck_actual": null}
+{"query": "一元二次方程", "kind": "name", "expected_ids": ["math_9a_rjb_cpt1"], "selfcheck_actual": "math_9a_rjb_cpt1"}
+{"query": "配方法", "kind": "name", "expected_ids": ["math_9a_rjb_cpt7"], "selfcheck_actual": "math_9a_rjb_cpt7"}
+{"query": "求根公式", "kind": "name", "expected_ids": ["math_9a_rjb_cpt9"], "selfcheck_actual": "math_9a_rjb_cpt9"}
+{"query": "二次函数", "kind": "name", "expected_ids": ["math_9a_rjb_cpt16"], "selfcheck_actual": "math_9a_rjb_cpt16"}
+{"query": "抛物线", "kind": "name", "expected_ids": ["math_9a_rjb_cpt18"], "selfcheck_actual": "math_9a_rjb_cpt18"}
+{"query": "顶点", "kind": "name", "expected_ids": ["math_9a_rjb_cpt19"], "selfcheck_actual": "math_9a_rjb_cpt19"}
+{"query": "相似三角形", "kind": "name", "expected_ids": ["math_9b_rjb_cpt13"], "selfcheck_actual": "math_9b_rjb_cpt13"}
+{"query": "相似比", "kind": "name", "expected_ids": [], "selfcheck_actual": "math_9b_rjb_cpt20"}
+{"query": "位似", "kind": "name", "expected_ids": [], "selfcheck_actual": null}
+{"query": "锐角三角函数", "kind": "name", "expected_ids": ["math_9b_rjb_cpt26"], "selfcheck_actual": "math_9b_rjb_cpt26"}
+{"query": "正弦", "kind": "name", "expected_ids": ["math_9b_rjb_cpt23"], "selfcheck_actual": "math_9b_rjb_cpt23"}
+{"query": "余弦", "kind": "name", "expected_ids": ["math_9b_rjb_cpt24"], "selfcheck_actual": "math_9b_rjb_cpt24"}
+{"query": "正切", "kind": "name", "expected_ids": ["math_9b_rjb_cpt25"], "selfcheck_actual": "math_9b_rjb_cpt25"}
+{"query": "常数项", "kind": "name", "expected_ids": ["math_9a_rjb_cpt5"], "selfcheck_actual": "math_9a_rjb_cpt5"}
+{"query": "SSS判定法", "kind": "name", "expected_ids": ["math_8a_rjb_cpt28"], "selfcheck_actual": "math_8a_rjb_cpt28"}
+{"query": "数据平均数", "kind": "name", "expected_ids": ["math_7b_rjb_cpt91"], "selfcheck_actual": "math_7b_rjb_cpt91"}
+{"query": "方程的图象", "kind": "name", "expected_ids": ["math_7b_rjb_cpt56"], "selfcheck_actual": "math_7b_rjb_cpt56"}
+{"query": "切线长定理", "kind": "name", "expected_ids": ["math_9a_rjb_cpt59"], "selfcheck_actual": "math_9a_rjb_cpt59"}
+{"query": "线段比较", "kind": "name", "expected_ids": ["math_7a_rjb_cpt67"], "selfcheck_actual": "math_7a_rjb_cpt67"}
+{"query": "小概率事件", "kind": "name", "expected_ids": ["math_9a_rjb_cpt80"], "selfcheck_actual": "math_9a_rjb_cpt80"}
+{"query": "中心对称", "kind": "name", "expected_ids": ["math_9a_rjb_cpt33"], "selfcheck_actual": "math_9a_rjb_cpt33"}
+{"query": "负数乘负数", "kind": "name", "expected_ids": ["math_7a_rjb_cpt20"], "selfcheck_actual": "math_7a_rjb_cpt20"}
+{"query": "因式分解法", "kind": "name", "expected_ids": ["math_9a_rjb_cpt11"], "selfcheck_actual": "math_9a_rjb_cpt11"}
+{"query": "三角形的边", "kind": "name", "expected_ids": ["math_8a_rjb_cpt1"], "selfcheck_actual": "math_8a_rjb_cpt1"}
+{"query": "三角形的内角", "kind": "name", "expected_ids": ["math_8a_rjb_cpt3"], "selfcheck_actual": "math_8a_rjb_cpt3"}
+{"query": "全面调查", "kind": "name", "expected_ids": ["math_7b_rjb_cpt76"], "selfcheck_actual": "math_7b_rjb_cpt76"}
+{"query": "消元思想", "kind": "name", "expected_ids": ["math_7b_rjb_cpt47"], "selfcheck_actual": "math_7b_rjb_cpt47"}
+{"query": "相交线", "kind": "name", "expected_ids": ["math_7b_rjb_cpt1"], "selfcheck_actual": "math_7b_rjb_cpt1"}
+{"query": "中心对称图形", "kind": "name", "expected_ids": ["math_9a_rjb_cpt36"], "selfcheck_actual": "math_9a_rjb_cpt36"}
+{"query": "象限", "kind": "name", "expected_ids": ["math_7b_rjb_cpt36"], "selfcheck_actual": "math_7b_rjb_cpt36"}
+{"query": "公因式", "kind": "name", "expected_ids": ["math_8a_rjb_cpt60"], "selfcheck_actual": "math_8a_rjb_cpt60"}
+{"query": "幂的乘方", "kind": "name", "expected_ids": ["math_8a_rjb_cpt53"], "selfcheck_actual": "math_8a_rjb_cpt53"}
+{"query": "函数的解析式", "kind": "name", "expected_ids": ["math_8b_rjb_cpt45"], "selfcheck_actual": "math_8b_rjb_cpt45"}
+{"query": "角角边", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt31"], "selfcheck_actual": "math_8a_rjb_cpt31"}
+{"query": "双曲线图象", "kind": "alias", "expected_ids": ["math_9b_rjb_cpt2"], "selfcheck_actual": "math_9b_rjb_cpt2"}
+{"query": "数据离散程度", "kind": "alias", "expected_ids": ["math_8b_rjb_cpt66"], "selfcheck_actual": "math_8b_rjb_cpt66"}
+{"query": "solution", "kind": "alias", "expected_ids": ["math_7a_rjb_cpt43"], "selfcheck_actual": "math_7a_rjb_cpt43"}
+{"query": "rotation", "kind": "alias", "expected_ids": ["math_9a_rjb_cpt30"], "selfcheck_actual": "math_9a_rjb_cpt30"}
+{"query": "weight", "kind": "alias", "expected_ids": ["math_8b_rjb_cpt62"], "selfcheck_actual": "math_8b_rjb_cpt62"}
+{"query": "polygon", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt14"], "selfcheck_actual": "math_8a_rjb_cpt14"}
+{"query": "arc", "kind": "alias", "expected_ids": ["math_9a_rjb_cpt45"], "selfcheck_actual": "math_9a_rjb_cpt45"}
+{"query": "贾宪三角", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt58"], "selfcheck_actual": "math_8a_rjb_cpt58"}
+{"query": "三角形全等", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt24"], "selfcheck_actual": "math_8a_rjb_cpt24"}
+{"query": "旋转", "kind": "alias", "expected_ids": ["math_9a_rjb_cpt30"], "selfcheck_actual": "math_9a_rjb_cpt30"}
+{"query": "斜边直角边", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt32"], "selfcheck_actual": "math_8a_rjb_cpt32"}
+{"query": "radius", "kind": "alias", "expected_ids": ["math_9a_rjb_cpt42"], "selfcheck_actual": "math_9a_rjb_cpt42"}
+{"query": "三次方根", "kind": "alias", "expected_ids": ["math_7b_rjb_cpt23"], "selfcheck_actual": "math_7b_rjb_cpt23"}
+{"query": "帕斯卡三角", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt58"], "selfcheck_actual": "math_8a_rjb_cpt58"}
+{"query": "边角边", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt29"], "selfcheck_actual": "math_8a_rjb_cpt29"}
+{"query": "二次方程", "kind": "alias", "expected_ids": ["math_9a_rjb_cpt1"], "selfcheck_actual": "math_9a_rjb_cpt1"}
+{"query": "权重", "kind": "alias", "expected_ids": ["math_8b_rjb_cpt62"], "selfcheck_actual": "math_8b_rjb_cpt62"}
+{"query": "长方形", "kind": "alias", "expected_ids": ["math_8b_rjb_cpt28"], "selfcheck_actual": "math_8b_rjb_cpt28"}
+{"query": "刚体变换", "kind": "alias", "expected_ids": ["math_8a_rjb_cpt25"], "selfcheck_actual": "math_8a_rjb_cpt25"}
+{"query": "本节课我们学习勾股定理及其逆定理的应用", "kind": "context", "expected_ids": ["math_8b_rjb_cpt11"], "expect_name": "勾股定理", "selfcheck_actual": "math_8b_rjb_cpt11"}
+{"query": "教学重点：掌握合并同类项的方法", "kind": "context", "expected_ids": ["math_7a_rjb_cpt39"], "expect_name": "合并同类项", "selfcheck_actual": "math_7a_rjb_cpt39"}
+{"query": "通过待定系数法确定一次函数的表达式", "kind": "context", "expected_ids": [], "expect_name": "待定系数法", "selfcheck_actual": "math_8b_rjb_cpt50"}
+{"query": "用配方法解一元二次方程 x²-4x+3=0", "kind": "context", "expected_ids": ["math_9a_rjb_cpt7"], "expect_name": "配方法", "selfcheck_actual": "math_9a_rjb_cpt1"}
+{"query": "复习提问：什么叫同类项？", "kind": "context", "expected_ids": ["math_7a_rjb_cpt38"], "expect_name": "同类项", "selfcheck_actual": "math_7a_rjb_cpt38"}
+{"query": "例 3：利用公式法分解因式", "kind": "context", "expected_ids": [], "expect_name": "公式法", "selfcheck_actual": null}
+{"query": "二次函数 y=ax²+bx+c 的图象是抛物线", "kind": "context", "expected_ids": ["math_9a_rjb_cpt16"], "expect_name": "二次函数", "selfcheck_actual": "math_9a_rjb_cpt16"}
+{"query": "分式的分母不能为零，这是分式有意义的条件", "kind": "context", "expected_ids": ["math_8a_rjb_cpt63"], "expect_name": "分式", "selfcheck_actual": "math_8a_rjb_cpt63"}
+{"query": "锐角三角函数中，sinA 表示角 A 的正弦", "kind": "context", "expected_ids": ["math_9b_rjb_cpt23"], "expect_name": "正弦", "selfcheck_actual": "math_9b_rjb_cpt26"}
+{"query": "两个三角形相似的判定定理", "kind": "context", "expected_ids": ["math_9b_rjb_cpt13"], "expect_name": "相似三角形", "selfcheck_actual": null}
+{"query": "全等三角形对应边相等、对应角相等", "kind": "context", "expected_ids": ["math_8a_rjb_cpt24"], "expect_name": "全等三角形", "selfcheck_actual": "math_8a_rjb_cpt24"}
+{"query": "数轴上右边的数总比左边的数大", "kind": "context", "expected_ids": ["math_7a_rjb_cpt8"], "expect_name": "数轴", "selfcheck_actual": "math_7a_rjb_cpt8"}
+{"query": "引导学生回顾有理数的加减法法则", "kind": "context", "expected_ids": ["math_7a_rjb_cpt6"], "expect_name": "有理数", "selfcheck_actual": "math_7a_rjb_cpt6"}
+{"query": "解方程的关键是灵活运用等式的性质", "kind": "context", "expected_ids": [], "expect_name": "等式的性质", "selfcheck_actual": "math_7a_rjb_cpt44"}
+{"query": "用加减消元法解二元一次方程组", "kind": "context", "expected_ids": [], "expect_name": "加减消元法", "selfcheck_actual": "math_7b_rjb_cpt45"}
+{"query": "把方程中的某一项改变符号后移到另一边，叫做移项", "kind": "context", "expected_ids": ["math_7a_rjb_cpt47"], "expect_name": "移项", "selfcheck_actual": "math_7a_rjb_cpt47"}
+{"query": "先把二次三项式配方，再用平方差公式分解", "kind": "context", "expected_ids": [], "expect_name": null, "selfcheck_actual": "math_8a_rjb_cpt56"}
+{"query": "先通分，再进行分式的加减运算", "kind": "context", "expected_ids": [], "expect_name": "通分", "selfcheck_actual": "math_8a_rjb_cpt63"}
+{"query": "提取公因式是因式分解的第一步", "kind": "context", "expected_ids": ["math_8a_rjb_cpt61"], "expect_name": "提公因式法", "selfcheck_actual": "math_8a_rjb_cpt59"}
+{"query": "正比例函数是一次函数的特殊情形", "kind": "context", "expected_ids": ["math_8b_rjb_cpt48"], "expect_name": "正比例函数", "selfcheck_actual": "math_8b_rjb_cpt48"}
+{"query": "利用判别式判断一元二次方程根的情况", "kind": "context", "expected_ids": [], "expect_name": null, "selfcheck_actual": "math_9a_rjb_cpt1"}
+{"query": "抛物线的顶点坐标决定了函数的最大值", "kind": "context", "expected_ids": ["math_9a_rjb_cpt19"], "expect_name": "顶点", "selfcheck_actual": "math_9a_rjb_cpt18"}
+{"query": "位似图形一定是相似图形", "kind": "context", "expected_ids": [], "expect_name": "位似", "selfcheck_actual": "math_9b_rjb_cpt11"}
+{"query": "相似比等于对应边的比", "kind": "context", "expected_ids": [], "expect_name": "相似比", "selfcheck_actual": null}
+{"query": "在直角三角形中，正切等于对边比邻边", "kind": "context", "expected_ids": ["math_9b_rjb_cpt25"], "expect_name": "正切", "selfcheck_actual": "math_9b_rjb_cpt25"}
+{"query": "余弦值随锐角的增大而减小", "kind": "context", "expected_ids": ["math_9b_rjb_cpt24"], "expect_name": "余弦", "selfcheck_actual": "math_9b_rjb_cpt24"}
+{"query": "绝对值的几何意义是数轴上点到原点的距离", "kind": "context", "expected_ids": ["math_7a_rjb_cpt11"], "expect_name": "绝对值", "selfcheck_actual": "math_7a_rjb_cpt11"}
+{"query": "互为相反数的两个数之和为零", "kind": "context", "expected_ids": ["math_7a_rjb_cpt10"], "expect_name": "相反数", "selfcheck_actual": "math_7a_rjb_cpt10"}
+{"query": "单项式和多项式统称为整式", "kind": "context", "expected_ids": ["math_7a_rjb_cpt37"], "expect_name": "整式", "selfcheck_actual": "math_7a_rjb_cpt31"}
+{"query": "分母中含有字母的式子叫做分式", "kind": "context", "expected_ids": ["math_8a_rjb_cpt63"], "expect_name": "分式", "selfcheck_actual": "math_8a_rjb_cpt63"}
+{"query": "求代数式的值之前要先化简", "kind": "context", "expected_ids": [], "expect_name": null, "selfcheck_actual": "math_8b_rjb_cpt5"}
+{"query": "天平两边同时加减相同的数等式仍成立", "kind": "context", "expected_ids": [], "expect_name": null, "selfcheck_actual": "math_7a_rjb_cpt44"}
+{"query": "导数", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "微分", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "积分", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "复数", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "虚数", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "行列式", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "排列组合", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "二项式定理", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "椭圆的离心率", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "参数方程", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "数列的通项公式", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "数学归纳法", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "平面向量", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "空间向量", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "充分必要条件", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "反函数", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": "math_8b_rjb_cpt43"}
+{"query": "对数函数", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": "math_8b_rjb_cpt43"}
+{"query": "指数方程", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": "math_7a_rjb_cpt26"}
+{"query": "线性回归", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "正态分布", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "条件概率", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": "math_9a_rjb_cpt74"}
+{"query": "极限", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "连续性", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "洛必达法则", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "泰勒展开", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": null}
+{"query": "柯西不等式", "kind": "distractor", "expected_ids": [], "note": "期望不命中初中概念集合", "selfcheck_actual": "math_7b_rjb_cpt57"}

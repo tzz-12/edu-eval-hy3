@@ -1,0 +1,116 @@
+{
+ "total_topic_concepts": 40,
+ "missing_count": 9,
+ "coverage_pct": 77.5,
+ "gaps": [
+  {
+   "missing_concept": "等式的性质",
+   "nearest": [
+    {
+     "id": "math_7a_rjb_cpt45",
+     "name": "等式的性质1",
+     "grade": "七年级上册",
+     "match_type": "contains"
+    },
+    {
+     "id": "math_7a_rjb_cpt46",
+     "name": "等式的性质2",
+     "grade": "七年级上册",
+     "match_type": "contains"
+    }
+   ]
+  },
+  {
+   "missing_concept": "代入消元法",
+   "nearest": [
+    {
+     "id": "math_7b_rjb_cpt54",
+     "name": "消元法",
+     "grade": "七年级下册",
+     "match_type": "contains"
+    },
+    {
+     "id": "math_7b_rjb_cpt48",
+     "name": "代入法",
+     "grade": "七年级下册",
+     "match_type": "fts"
+    }
+   ]
+  },
+  {
+   "missing_concept": "加减消元法",
+   "nearest": [
+    {
+     "id": "math_7b_rjb_cpt54",
+     "name": "消元法",
+     "grade": "七年级下册",
+     "match_type": "contains"
+    }
+   ]
+  },
+  {
+   "missing_concept": "全等三角形的判定",
+   "nearest": [
+    {
+     "id": "math_8a_rjb_cpt24",
+     "name": "全等三角形",
+     "grade": "八年级上册",
+     "match_type": "contains"
+    },
+    {
+     "id": "math_8a_rjb_cpt28",
+     "name": "SSS判定法",
+     "grade": "八年级上册",
+     "match_type": "fts"
+    }
+   ]
+  },
+  {
+   "missing_concept": "公式法",
+   "nearest": [
+    {
+     "id": "math_9a_rjb_cpt14",
+     "name": "公式法（求根公式）",
+     "grade": "九年级上册",
+     "match_type": "contains"
+    }
+   ]
+  },
+  {
+   "missing_concept": "通分",
+   "nearest": [
+    {
+     "id": "math_8a_rjb_cpt68",
+     "name": "分式的通分",
+     "grade": "八年级上册",
+     "match_type": "contains"
+    }
+   ]
+  },
+  {
+   "missing_concept": "待定系数法",
+   "nearest": []
+  },
+  {
+   "missing_concept": "相似比",
+   "nearest": [
+    {
+     "id": "math_9b_rjb_cpt20",
+     "name": "相似三角形的面积关系",
+     "grade": "九年级下册",
+     "match_type": "fts"
+    },
+    {
+     "id": "math_9b_rjb_cpt19",
+     "name": "相似三角形的性质：对应线段成比例",
+     "grade": "九年级下册",
+     "match_type": "fts"
+    }
+   ]
+  },
+  {
+   "missing_concept": "位似",
+   "nearest": []
+  }
+ ]
+}

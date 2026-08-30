@@ -21,7 +21,8 @@ class ArbitrateJudge(BaseJudge):
     )
 
     def build_user_prompt(self, text: str, context: Dict[str, Any],
-                          kb_context: str = "") -> str:
+                          kb_context: str = "",
+                          rule_evidence: str = "") -> str:
         # kb_context 此处复用为"争议维度 + 主裁判分数 + 复核意见"的 JSON
         lines = []
         for did in D.DIMENSIONS:

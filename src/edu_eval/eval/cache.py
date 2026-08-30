@@ -15,9 +15,12 @@ PROMPT_VERSION = "v1"  # 提示词改动时递增，自动失效旧缓存
 CACHE_DIR = os.path.join("results", ".cache", "judge")
 
 
-def cache_key(text: str, role: str, temperature: float, model: str) -> str:
+def cache_key(text: str, role: str, temperature: float, model: str,
+              rule_evidence: str = "") -> str:
+    """rule_evidence 必须参与哈希：同一段正文在不同规则判定下，
+    Judge 看到的证据不同，若共用一个缓存会串味。"""
     payload = json.dumps(
-        [PROMPT_VERSION, role, temperature, model, text],
+        [PROMPT_VERSION, role, temperature, model, text, rule_evidence],
         ensure_ascii=False, sort_keys=True,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

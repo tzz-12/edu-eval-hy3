@@ -15,7 +15,9 @@
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 import random
 import re
 from dataclasses import dataclass, field
@@ -152,6 +154,29 @@ class RuleFinding:
     detail: dict = field(default_factory=dict)
 
 
+def load_grade_exempt(path: Optional[str] = None) -> Dict[str, dict]:
+    """加载「概念→年级豁免表」。
+
+    背景：K12-KGraph 只在概念首次作为章节主条目出现时建节点，导致部分
+    贯穿性基础概念被挂到偏晚册次（如「代数式」实为七上引入，图谱挂八下）。
+    直接用它判超纲会产生**系统性假阳性**——干净样本也会被判超纲。
+    豁免表人工审核、逐条附教材依据，仅用于自动抽取路径。
+    """
+    path = path or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "kb", "grade_exempt.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out: Dict[str, dict] = {}
+    for e in data.get("exempt") or []:
+        if e.get("name"):
+            out[e["name"]] = e
+    return out
+
+
 REQUIRED_SECTIONS = [
     ("教学目标", ["教学目标", "学习目标"]),
     ("重难点", ["教学重点", "教学难点", "重难点"]),
@@ -161,10 +186,15 @@ REQUIRED_SECTIONS = [
 
 
 class RuleEngine:
-    def __init__(self, grade_map=None, retriever=None):
-        """grade_map: edu_eval.kb.grade_map.GradeMap（可选，供年级比对）。"""
+    def __init__(self, grade_map=None, retriever=None,
+                 grade_exempt: Optional[Dict[str, dict]] = None):
+        """grade_map: edu_eval.kb.grade_map.GradeMap（可选，供年级比对）。
+        grade_exempt: 概念→年级豁免表，修正图谱收录偏差造成的假阳性。
+        """
         self.grade_map = grade_map
         self.retriever = retriever
+        self.grade_exempt = (load_grade_exempt() if grade_exempt is None
+                             else grade_exempt)
 
     # ---- R-FORMULA：公式核验 ----
     def check_formulas(self, text: str) -> List[RuleFinding]:
@@ -203,6 +233,60 @@ class RuleEngine:
                                ev, {"analysis": rep, "strict": strict})
         return RuleFinding("R-GRADE", "pass", declared, {"analysis": rep})
 
+    def check_grade_by_text(self, text: str, declared: str,
+                            retriever=None) -> List[RuleFinding]:
+        """从文本抽取概念并分两级判定年级越界。
+
+        分级依据不是"概念来自人工还是检索"，而是**概念在文本中是否显式出现**：
+          - 显式概念（概念名原文出现在教学设计里）→ strict=True，越界判 fail。
+            理由：白纸黑字写了「一元二次方程」，不存在检索误报可能。
+          - 联想概念（仅由检索器召回、原文未出现）→ strict=False，越界判 warn。
+            理由：图谱收录有局限（如「代数式」仅挂八下），联想结果有误报风险。
+
+        concept 名长度 < 3 的不做显式判定（「线」「点」等短名子串误匹配率高）。
+        豁免表中的概念（图谱收录偏差，如「代数式」）不参与判定，另行记录。
+        """
+        ret = retriever or self.retriever
+        if not self.grade_map:
+            return [RuleFinding("R-GRADE", "ne", "",
+                                {"reason": "年级映射表未加载"})]
+
+        explicit, associated, exempted = [], [], []
+        if ret:
+            seen = set()
+            for hit in ret.search(text, top_k=10):
+                if hit.id in seen:
+                    continue
+                seen.add(hit.id)
+                if hit.name in self.grade_exempt:
+                    exempted.append(hit.name)
+                elif len(hit.name) >= 3 and hit.name in text:
+                    explicit.append(hit.id)
+                else:
+                    associated.append(hit.id)
+
+        out = []
+        if exempted:
+            out.append(RuleFinding(
+                "R-GRADE-EXEMPT", "ne", "、".join(sorted(set(exempted))),
+                {"reason": "图谱收录偏差已核实，不作为超纲判据",
+                 "detail": [self.grade_exempt[n] for n in
+                            sorted(set(exempted))]}))
+        if explicit:
+            f = self.check_grade(explicit, declared, strict=True)
+            f.rule_id = "R-GRADE-EXPL"
+            f.detail["n_concepts"] = len(explicit)
+            out.append(f)
+        if associated:
+            f = self.check_grade(associated, declared, strict=False)
+            f.rule_id = "R-GRADE-ASSOC"
+            f.detail["n_concepts"] = len(associated)
+            out.append(f)
+        if not out:
+            out.append(RuleFinding("R-GRADE", "ne", declared,
+                                   {"reason": "未从文本抽取到任何已知概念"}))
+        return out
+
     # ---- R-STRUCT：结构完整性 ----
     def check_structure(self, text: str) -> List[RuleFinding]:
         findings = []
@@ -216,10 +300,19 @@ class RuleEngine:
     # ---- 汇总 ----
     def evaluate(self, text: str, declared_grade: str = "",
                  concept_ids: Optional[List[str]] = None,
-                 strict_grade: bool = False) -> dict:
+                 strict_grade: bool = False,
+                 retriever=None) -> dict:
         findings = self.check_formulas(text)
-        findings.append(self.check_grade(concept_ids or [], declared_grade,
-                                         strict=strict_grade))
+        if concept_ids:
+            # 调用方显式给了概念 ID（人工标注 / 课标锚定）→ 按调用方意图定级
+            findings.append(self.check_grade(concept_ids, declared_grade,
+                                             strict=strict_grade))
+        elif self.grade_map:
+            # 未提供概念 ID → 从文本自动抽取并分两级（显式 strict / 联想 warn）
+            findings.extend(self.check_grade_by_text(
+                text, declared_grade, retriever))
+        else:
+            findings.append(self.check_grade([], declared_grade))
         findings.extend(self.check_structure(text))
 
         formula_fails = [f for f in findings
