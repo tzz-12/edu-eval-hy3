@@ -81,11 +81,35 @@ python -m edu_eval.web
 # 浏览器打开 http://127.0.0.1:8000 ，上传文件并填写声明元数据即可评估
 ```
 
-### 5.3 运行测试
+### 5.3 知识库重建
+
+`data/kb/` 因许可原因不入库（K12-KGraph 为 CC BY-NC-SA 4.0），克隆后需本地重建：
 
 ```bash
-HY3_MOCK=1 python -m pytest tests/ -v
+export PYTHONPATH=src
+# 数据来源与获取方式见 docs/sources_inventory.md
+python -m edu_eval.kb.ingest      # 导入初中概念 → data/kb/knowledge.{jsonl,db}
+python -m edu_eval.kb.grade_map   # 概念→年级映射 → data/kb/concept_grade.json
+python -m edu_eval.kb.curriculum  # 课标结构化 → data/kb/curriculum_junior.jsonl
 ```
+
+### 5.4 评测资产生成
+
+```bash
+export PYTHONPATH=src
+# 缺陷样本（注入后自动跑规则层做检出闭环验证）
+python scripts/inject_defects.py --topic 一元一次方程 --grade 七年级
+# 检索测试集 + 知识库覆盖缺口清单
+python scripts/build_retrieval_testset.py
+```
+
+### 5.5 运行测试
+
+```bash
+HY3_MOCK=1 PYTHONPATH=src python -m pytest tests/ -v
+```
+
+未构建知识库时，依赖知识库的测试自动跳过（`skip`），其余照常运行。
 
 ## 6. 评估维度一览
 
@@ -111,24 +135,46 @@ HY3_MOCK=1 python -m pytest tests/ -v
 ```
 edu-eval-hy3/
 ├── README.md
+├── DESIGN.md               # 方案定稿（8 维度 / G0 准入 / 评测方法）
+├── IMPLEMENTATION_PLAN.md  # 落地计划（Phase 0/1 分离、里程碑）
 ├── .env.example            # 密钥模板（.env 已被忽略）
 ├── requirements.txt
 ├── src/edu_eval/
 │   ├── config.py           # 仅从环境变量读取配置
-│   ├── hy3.py              # Hy3 OpenAI 兼容客户端封装
+│   ├── hy3.py              # Hy3 OpenAI 兼容客户端封装（含 mock 模式）
 │   ├── cli.py              # 命令行入口
-│   ├── web.py             # 可选 Web 应用（FastAPI）
-│   ├── parse/parsers.py    # 多格式解析（md/txt/docx/pdf/pptx）
+│   ├── web.py              # Web 应用：HTML 报告（维度卡片+证据+雷达图）
+│   ├── parse/
+│   │   ├── parsers.py      # 多格式解析（md/txt/docx/pdf/pptx）
+│   │   └── layout.py       # 公式标记与章节层级归一
+│   ├── kb/                 # 知识库层
+│   │   ├── schema.py       # Tier1/Tier2 条目 schema + 来源元数据校验
+│   │   ├── sources.yaml    # 四个来源的许可与约束清单
+│   │   ├── ingest.py       # K12-KGraph 导入 + FTS5 索引
+│   │   ├── retriever.py    # 三层检索（精确 / 长度加权子串 / FTS 兜底）
+│   │   ├── grade_map.py    # 概念→年级确定性映射（维度 3 查表）
+│   │   ├── curriculum.py   # 课标 2022 OCR → 结构化条目
+│   │   └── grade_exempt.json  # 图谱收录偏差豁免表（逐条附教材依据）
 │   └── eval/
 │       ├── dimensions.py   # 维度定义（与方案 §4.2 一致）
-│       ├── knowledge_base.py  # 本地知识库检索（知识准入）
-│       ├── judge.py        # 多 Judge 编排
+│       ├── rules.py        # 确定性规则层（零 LLM）：公式/年级/结构
+│       ├── orchestrator.py # 多 Judge 编排（规则层前置、复核、仲裁）
+│       ├── judges/         # fact / design / expression_safety / review / arbitrate
+│       ├── cache.py        # 磁盘缓存（键含样本+角色+提示版本+规则证据）
+│       ├── rubric.py       # 量规访问层（分数档位、雷达图 SVG）
 │       ├── aggregator.py   # 确定性聚合（权重/红线/准入）
-│       └── run_eval.py     # 评估主流程
+│       └── run_eval.py     # 评估主流程（委托编排器）
+├── scripts/
+│   ├── inject_defects.py   # 缺陷注入器 + 规则层检出闭环验证
+│   └── build_retrieval_testset.py  # 检索测试集 + 知识库缺口清单
 ├── data/
-│   ├── knowledge_base/sample_kb.jsonl   # 示例知识库（课程标准条目）
-│   └── samples/example_lesson.md        # 示例教学设计
-└── tests/test_smoke.py
+│   ├── samples/            # 示例教学设计、注入缺陷样本
+│   ├── testsets/           # 检索测试集、覆盖缺口清单（入库）
+│   └── kb/                 # 知识库衍生产物（不入库，见 §5.3 重建）
+├── docs/
+│   ├── sources_inventory.md  # 资料来源与许可清单
+│   └── kb_scope.md           # 知识库范围、已知局限与实测覆盖率
+└── tests/                  # 56 个测试
 ```
 
 ## 8. 能力边界（诚实说明）
@@ -138,6 +184,25 @@ edu-eval-hy3/
 - 评估器不宣称等同于教师专家判断；结论限定为：知识条目可追溯、覆盖范围内的已知错误不会被
   其他维度高分抵消、教学缺陷具备可测判别力、在重复运行中保持基本稳定。
 - PDF / PPTX / 图片的解析质量会影响评估，复杂版面或公式识别失真时可能标记 `NE`，属解析层误差。
+- 规则层只覆盖**确定性缺陷**（公式恒等错误、年级越界、结构完整性），**语义层缺陷**
+  （目标空泛、启发引导缺失、伪启发包装）必须由 LLM Judge 判定。详见下方实测数据。
+
+### 8.1 当前实测数据（非目标值）
+
+| 项目 | 实测值 | 说明 |
+|---|---|---|
+| 概念→年级映射覆盖率 | 451/451 = 100% | 沿图谱 `appears_in`/`is_part_of` 边推导 |
+| 13 课题核心概念覆盖 | 31/40 = **77.5%** | 缺失集中在方法类概念，缺口清单见 `data/testsets/kb_gaps.json` |
+| 检索 top3 命中率 | name/alias 100%、context 90% | 138 条测试集自动评测 |
+| 检索零召回率（干扰项） | 81% | 高中术语不误报为初中概念 |
+| 规则层缺陷检出 | 10 条注入样本 → FAIL 2 / WARN 1 / 未检出 7 | 未检出的 7 条为语义层缺陷，按设计交由 LLM Judge |
+
+上述口径与生成方式见 `docs/kb_scope.md` §5，均可一键复算。
+
+### 8.2 当前状态
+
+Phase 0（不依赖 Hy3 Key 的部分）已完成，M1/M2 里程碑达成。
+Phase 1（样本生成、Judge 实测、判别力/一致性/对抗性三项实验）需要 Hy3 接入信息后开展。
 
 ## 9. 许可与归属
 
