@@ -1,22 +1,40 @@
 """多格式文件解析：Markdown / TXT / DOCX / PDF / PPTX → 结构化文本。
 
 解析层只负责把不同格式统一抽取为可评估的正文文本与简单结构信息，
-不判断内容质量。PDF 与 PPTX 依赖第三方库；若解析失败会标记 parse_status=partial。
+不判断内容质量。
+
+P0-6 升级：
+- PDF 优先用 PyMuPDF（fitz），pdfplumber 兜底；空文本扫描件返回
+  parse_status="ocr_required"（明确状态，而非含糊的 partial）。
+- 全格式输出页序（pages）、章节层级（structure）、公式标记（formulas）。
+- 置信度按格式与抽取量分级，供上层决定是否阻断（G0 解析不可靠 → NE）。
 """
 from __future__ import annotations
 
 import os
 import re
 from dataclasses import dataclass, field
+from typing import List
+
+from edu_eval.parse.layout import build_outline, extract_formula_marks
 
 
 @dataclass
 class ParsedDoc:
     text: str
-    structure: List[str] = field(default_factory=list)  # 章节标题列表
-    parse_status: str = "ok"          # ok / partial
+    structure: List[str] = field(default_factory=list)   # 章节标题列表
+    pages: List[str] = field(default_factory=list)       # 按页/幻灯片切分的文本
+    formulas: List[str] = field(default_factory=list)    # 公式标记
+    parse_status: str = "ok"          # ok / partial / ocr_required
     parse_confidence: float = 0.95
     notes: str = ""
+
+    def finalize(self) -> "ParsedDoc":
+        """统一补算结构字段（各格式解析器填充 text/pages 后调用）。"""
+        self.formulas = extract_formula_marks(self.text)
+        if not self.structure:
+            self.structure = [t for _, t in build_outline(self.text)]
+        return self
 
 
 def parse_file(path: str) -> ParsedDoc:
@@ -32,15 +50,10 @@ def parse_file(path: str) -> ParsedDoc:
     raise ValueError(f"不支持的文件格式：{ext}（支持 .md/.txt/.docx/.pdf/.pptx）")
 
 
-def _split_sections(text: str) -> List[str]:
-    heads = re.findall(r"^#{1,6}\s+(.+)$|^(第?[一二三四五六七八九十\d]+[、.．]\s*.+)$", text, re.M)
-    return [h[0] or h[1] for h in heads if (h[0] or h[1])]
-
-
 def _parse_text(path: str) -> ParsedDoc:
     with open(path, encoding="utf-8", errors="replace") as f:
         text = f.read()
-    return ParsedDoc(text=text, structure=_split_sections(text), parse_confidence=0.98)
+    return ParsedDoc(text=text, parse_confidence=0.98).finalize()
 
 
 def _parse_docx(path: str) -> ParsedDoc:
@@ -53,25 +66,72 @@ def _parse_docx(path: str) -> ParsedDoc:
     parts = [p.text for p in doc.paragraphs if p.text.strip()]
     heads = [p.text.strip() for p in doc.paragraphs
              if p.style.name.startswith("Heading") and p.text.strip()]
-    return ParsedDoc(text="\n".join(parts), structure=heads, parse_confidence=0.95)
+    # DOCX 无固定分页概念，按大节近似分页
+    pages = _approx_pages(parts)
+    return ParsedDoc(text="\n".join(parts), structure=heads, pages=pages,
+                     parse_confidence=0.95).finalize()
+
+
+def _approx_pages(parts: List[str], per_page: int = 25) -> List[str]:
+    pages = []
+    for i in range(0, len(parts), per_page):
+        pages.append("\n".join(parts[i:i + per_page]))
+    return pages or [""]
 
 
 def _parse_pdf(path: str) -> ParsedDoc:
+    pages = None
+    notes = []
+    # 1) PyMuPDF（优先）
     try:
-        import pdfplumber
+        try:
+            import pymupdf as pdfmod  # 新 API
+        except ImportError:  # 兼容旧版本
+            import fitz as pdfmod
+        with pdfmod.open(path) as pdf:
+            pages = [pg.get_text("text") or "" for pg in pdf]
+        if any(p.strip() for p in pages):
+            return ParsedDoc(
+                text="\n".join(pages),
+                structure=[f"第{i+1}页" for i in range(len(pages))],
+                pages=pages, parse_confidence=0.92,
+            ).finalize()
     except ImportError:
-        return ParsedDoc(text="", parse_status="partial", parse_confidence=0.0,
-                         notes="未安装 pdfplumber，无法解析 .pdf。请 pip install pdfplumber。")
-    try:
-        with pdfplumber.open(path) as pdf:
-            pages = [pg.extract_text() or "" for pg in pdf.pages]
-        text = "\n".join(pages)
-        return ParsedDoc(text=text, structure=[f"第{i+1}页" for i in range(len(pages))],
-                         parse_confidence=0.9 if text.strip() else 0.3,
-                         notes="" if text.strip() else "PDF 未抽取到文本（可能为图片型）。")
+        notes.append("未安装 PyMuPDF，尝试 pdfplumber 兜底")
     except Exception as exc:  # noqa: BLE001
-        return ParsedDoc(text="", parse_status="partial", parse_confidence=0.0,
-                         notes=f"PDF 解析失败：{exc}")
+        notes.append(f"PyMuPDF 解析失败：{exc}，尝试 pdfplumber 兜底")
+
+    # 2) pdfplumber 兜底
+    if pages is None or not any(p.strip() for p in pages):
+        try:
+            import pdfplumber
+            with pdfplumber.open(path) as pdf:
+                pages = [pg.extract_text() or "" for pg in pdf.pages]
+        except ImportError:
+            return ParsedDoc(
+                text="", parse_status="partial", parse_confidence=0.0,
+                notes="未安装 PyMuPDF / pdfplumber，无法解析 .pdf。",
+            )
+        except Exception as exc:  # noqa: BLE001
+            return ParsedDoc(
+                text="", parse_status="partial", parse_confidence=0.0,
+                notes=f"PDF 解析失败：{exc}",
+            )
+
+    text = "\n".join(pages)
+    if not text.strip():
+        # 空文本 → 图片型扫描件，明确状态（G0 将返回 NE）
+        return ParsedDoc(
+            text="", pages=pages,
+            structure=[f"第{i+1}页" for i in range(len(pages))],
+            parse_status="ocr_required", parse_confidence=0.1,
+            notes="PDF 未抽取到文本：图片型扫描件，需要 OCR 后再评估。",
+        )
+    return ParsedDoc(
+        text=text, pages=pages,
+        structure=[f"第{i+1}页" for i in range(len(pages))],
+        parse_confidence=0.88, notes="; ".join(notes),
+    ).finalize()
 
 
 def _parse_pptx(path: str) -> ParsedDoc:
@@ -87,7 +147,15 @@ def _parse_pptx(path: str) -> ParsedDoc:
         for shape in slide.shapes:
             if shape.has_text_frame:
                 buf.append(shape.text_frame.text)
-        slides_text.append(f"[幻灯片 {i}]\n" + "\n".join(buf))
-    text = "\n\n".join(slides_text)
-    return ParsedDoc(text=text, structure=[f"幻灯片 {i+1}" for i in range(len(prs.slides))],
-                     parse_confidence=0.9)
+        # 备注页文本（教师讲稿，对评估很重要）
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame is not None:
+            note = slide.notes_slide.notes_text_frame.text.strip()
+            if note:
+                buf.append(f"[备注] {note}")
+        slides_text.append("\n".join(buf))
+    pages = [f"[幻灯片 {i+1}]\n{t}" for i, t in enumerate(slides_text)]
+    return ParsedDoc(
+        text="\n\n".join(pages),
+        structure=[f"幻灯片 {i+1}" for i in range(len(slides_text))],
+        pages=pages, parse_confidence=0.9,
+    ).finalize()

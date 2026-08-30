@@ -53,6 +53,12 @@ class TestFormulaVerification:
         assert verify_equation("3+4=7").verdict == "pass"
         assert verify_equation("3+4=8").verdict == "fail"
 
+    def test_conditional_equation_ne(self):
+        # 方程与条件等式：两侧符号集不同，非公式断言 → NE（交由 Judge）
+        assert verify_equation("2x+3=11").verdict == "ne"
+        assert verify_equation("ax+b=c").verdict == "ne"
+        assert verify_equation("a+c=b+c").verdict == "ne"
+
     def test_unparseable_ne(self):
         # 不可解析的碎片 → NE（保守判定，不猜测）
         assert verify_equation("中文=无法解析").verdict == "ne"
@@ -136,9 +142,24 @@ class TestRuleEngine:
         gm = GradeMap.load(GRADE_JSON)
         x2 = next(c for c, v in gm.mapping.items() if v["name"] == "一元二次方程")
         rep = RuleEngine(grade_map=gm).evaluate(
-            GOOD_DOC, declared_grade="七年级", concept_ids=[x2])
+            GOOD_DOC, declared_grade="七年级", concept_ids=[x2],
+            strict_grade=True)
         fails = [f for f in rep["findings"] if f["verdict"] == "fail"]
         assert any("一元二次方程" in f["evidence"] for f in fails)
+
+    @requires_kb
+    def test_grade_auto_retrieval_only_warns(self):
+        """宽松模式（自动检索场景）：越界只报 warn，不判 FAIL（防误报）。"""
+        gm = GradeMap.load(GRADE_JSON)
+        x2 = next(c for c, v in gm.mapping.items() if v["name"] == "一元二次方程")
+        rep = RuleEngine(grade_map=gm).evaluate(
+            GOOD_DOC, declared_grade="七年级", concept_ids=[x2],
+            strict_grade=False)
+        fails = [f for f in rep["findings"]
+                 if f["rule_id"] == "R-GRADE" and f["verdict"] == "fail"]
+        warns = [f for f in rep["findings"]
+                 if f["rule_id"] == "R-GRADE" and f["verdict"] == "warn"]
+        assert not fails and warns
 
 
 # ---------------- schema ----------------

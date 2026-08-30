@@ -1,4 +1,7 @@
-"""评估主流程：解析 → 知识准入 → 多 Judge 评分 → 复核/仲裁 → 聚合 → 报告。"""
+"""评估主流程入口（向后兼容外壳）：内部委托 Orchestrator 编排。
+
+编排顺序：解析 → 规则层 → 知识准入 → 多 Judge 评分 → 复核/仲裁 → 聚合 → 报告。
+"""
 from __future__ import annotations
 
 import json
@@ -7,12 +10,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..config import Hy3Config
-from ..hy3 import Hy3Client
 from ..parse.parsers import ParsedDoc, parse_file
 from . import dimensions as D
-from .aggregator import aggregate
-from .judge import multimodal_cross_check, run_judge_group
 from .knowledge_base import KnowledgeBase
+from .orchestrator import Orchestrator, load_kb_assets
 
 
 @dataclass
@@ -83,54 +84,31 @@ class Report:
 def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
              kb: Optional[KnowledgeBase] = None) -> Report:
     ctx = ctx or EvalContext()
-    client = Hy3Client(cfg)
     if kb is None:
-        kb = KnowledgeBase([])
+        kb, gm, retriever = load_kb_assets()
+    else:
+        gm, retriever = None, None
 
     parsed: ParsedDoc = parse_file(path)
     context = {"grade": ctx.grade, "version": ctx.version,
                "topic": ctx.topic, "period": ctx.period}
 
-    # 1) 事实 Judge：知识准入（G0）+ 学段适配（维度 3）
-    fact = run_judge_group(client, "fact", parsed.text, context, kb)
-    admission = fact.get("admission", "PASS")
-    redline = bool(fact.get("redline", False))
-    scores: Dict[str, Any] = dict(fact.get("scores", {}))
-    suggestions: List[str] = list(fact.get("suggestions", []))
-    kb_hits = len(kb.retrieve(parsed.text, top_k=5)) if kb.entries else 0
+    orch = Orchestrator(cfg, kb=kb, grade_map=gm, retriever=retriever)
+    result = orch.run(parsed, context)
+    return _to_report(result)
 
-    report = Report(admission=admission, redline=redline, scores=scores,
-                    parse={"parse_status": parsed.parse_status,
-                           "parse_confidence": parsed.parse_confidence,
-                           "notes": parsed.notes},
-                    kb_hits=kb_hits)
 
-    # 2) 知识准入未通过：只输出知识诊断，不生成教学质量总分
-    if admission != "PASS":
-        report.aggregation = aggregate(admission, redline, scores)
-        report.suggestions = suggestions
-        return report
-
-    # 3) 教学设计 Judge（1/4/7/8/9）+ 表达与安全 Judge（5/6/A）
-    design = run_judge_group(client, "design", parsed.text, context, kb)
-    expr = run_judge_group(client, "expression_safety", parsed.text, context, kb)
-    scores.update(design.get("scores", {}))
-    scores.update(expr.get("scores", {}))
-    suggestions.extend(design.get("suggestions", []))
-    suggestions.extend(expr.get("suggestions", []))
-    if expr.get("redline"):
-        redline = True
-    report.redline = redline
-    report.scores = scores
-    report.suggestions = suggestions
-
-    # 4) 复核 Judge：检查证据完整性，标记需仲裁项
-    review = multimodal_cross_check(client, {"scores": scores}, parsed.text, context)
-    report.arbitration = review.get("needs_arbitration", [])
-
-    # 5) 确定性聚合
-    report.aggregation = aggregate(admission, redline, scores)
-    return report
+def _to_report(result: Dict[str, Any]) -> Report:
+    return Report(
+        admission=result["admission"],
+        redline=result["redline"],
+        scores=result["scores"],
+        suggestions=result["suggestions"],
+        aggregation=result["aggregation"],
+        parse=result["parse"],
+        arbitration=result.get("arbitration", []),
+        kb_hits=result.get("kb_hits", 0),
+    )
 
 
 def evaluate_from_text(text: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,

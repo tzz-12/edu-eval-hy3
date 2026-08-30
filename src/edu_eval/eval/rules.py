@@ -101,6 +101,14 @@ def verify_equation(raw: str) -> EquationCheck:
         return EquationCheck(raw, "ne", f"不可解析: {type(e).__name__}")
 
     free = sorted(le.free_symbols | re_.free_symbols, key=str)
+    # 关键区分：只有两侧自由符号集完全一致才是「恒等式/公式断言」。
+    # 方程（2x+3=11）、性质描述（a+c=b+c）等条件等式不做恒等判定 → NE。
+    ls, rs = le.free_symbols, re_.free_symbols
+    if ls != rs:
+        return EquationCheck(
+            raw, "ne",
+            "条件等式或方程（两侧符号集不同），非公式断言，交由 Judge",
+        )
     try:
         # 1) 符号判定
         diff = sympy.simplify(le - re_)
@@ -173,7 +181,11 @@ class RuleEngine:
         return findings
 
     # ---- R-GRADE：年级比对（维度 3 确定性证据）----
-    def check_grade(self, concept_ids: List[str], declared: str) -> RuleFinding:
+    def check_grade(self, concept_ids: List[str], declared: str,
+                    strict: bool = False) -> RuleFinding:
+        """strict=False：越界只报 warn（自动检索的概念有误报风险，
+        如「代数式」在图谱仅挂八下二次根式章节，但人教版七上已引入）。
+        strict=True：越界报 fail（显式确认的核心概念，如测试场景）。"""
         if not self.grade_map:
             return RuleFinding("R-GRADE", "ne", "", {"reason": "年级映射表未加载"})
         if not declared:
@@ -187,8 +199,8 @@ class RuleEngine:
         if beyond:
             ev = "；".join(
                 f"「{b['name']}」属 {('、'.join(b['grades']))}" for b in beyond[:5])
-            return RuleFinding("R-GRADE", "fail" if len(beyond) >= 1 else "warn",
-                               ev, {"analysis": rep})
+            return RuleFinding("R-GRADE", "fail" if strict else "warn",
+                               ev, {"analysis": rep, "strict": strict})
         return RuleFinding("R-GRADE", "pass", declared, {"analysis": rep})
 
     # ---- R-STRUCT：结构完整性 ----
@@ -203,9 +215,11 @@ class RuleEngine:
 
     # ---- 汇总 ----
     def evaluate(self, text: str, declared_grade: str = "",
-                 concept_ids: Optional[List[str]] = None) -> dict:
+                 concept_ids: Optional[List[str]] = None,
+                 strict_grade: bool = False) -> dict:
         findings = self.check_formulas(text)
-        findings.append(self.check_grade(concept_ids or [], declared_grade))
+        findings.append(self.check_grade(concept_ids or [], declared_grade,
+                                         strict=strict_grade))
         findings.extend(self.check_structure(text))
 
         formula_fails = [f for f in findings
@@ -263,8 +277,8 @@ if __name__ == "__main__":
     g7 = next(cid for cid, v in gm.mapping.items() if v["name"] == "有理数")
     engine2 = RuleEngine(grade_map=gm)
     r_grade = engine2.evaluate("正文", declared_grade="七年级",
-                               concept_ids=[g7, x2])
-    print("\n== 年级超纲样本（七年级设计引用一元二次方程）==")
+                               concept_ids=[g7, x2], strict_grade=True)
+    print("\n== 年级超纲样本（七年级设计引用一元二次方程，严格模式）==")
     for f in r_grade["findings"]:
         if f["rule_id"] == "R-GRADE":
             print(f"  [{f['verdict'].upper()}] {f['evidence']}")
