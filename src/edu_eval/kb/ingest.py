@@ -9,7 +9,7 @@
 导入完成后校验边推导结果与 id 约定（math_{7a..9b}_rjb_*）的一致性，
 不一致的概念标记 quarantined，不参与检索与 G0。
 
-用法：python -m kb.ingest  （在 src/ 目录下）
+用法：python -m edu_eval.kb.ingest  （在 src/ 或仓库根目录下）
 """
 from __future__ import annotations
 
@@ -18,12 +18,10 @@ import json
 import os
 import re
 import sqlite3
-import sys
 from collections import Counter
 from typing import Dict, List, Optional
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from kb.schema import Tier1Entry, dump_jsonl  # noqa: E402
+from edu_eval.kb.schema import Tier1Entry, dump_jsonl
 
 BOOK_GRADE = {
     "math_7a_rjb": "七年级上册",

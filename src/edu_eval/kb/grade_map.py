@@ -179,11 +179,10 @@ def build(raw_path: str, jsonl_path: str, out_path: str) -> dict:
 
 
 if __name__ == "__main__":
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    raw = os.path.join(here, "..", "data", "raw", "k12_math.json")
-    jsonl = os.path.join(here, "..", "data", "kb", "knowledge.jsonl")
-    out = os.path.join(here, "..", "data", "kb", "concept_grade.json")
-    mapping = build(raw, jsonl, out)
+    # 在仓库根目录运行：python -m edu_eval.kb.grade_map
+    mapping = build("data/raw/k12_math.json",
+                    "data/kb/knowledge.jsonl",
+                    "data/kb/concept_grade.json")
 
     mapped = sum(1 for v in mapping.values() if v["grades"])
     print(f"映射表：{len(mapping)} 概念，其中年级可映射 {mapped} "
@@ -194,6 +193,7 @@ if __name__ == "__main__":
         print(f"  {g}: {cnt.get(g, 0)}")
 
     # 性能与语义自测
+    out = "data/kb/concept_grade.json"
     gm = GradeMap.load(out)
     t0 = time.perf_counter()
     for _ in range(1000):

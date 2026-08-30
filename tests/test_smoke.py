@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 仓库根
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from edu_eval.eval import dimensions as D  # noqa: E402
