@@ -22,6 +22,12 @@ KB_DB = os.path.join(KB_DIR, "knowledge.db")
 GRADE_JSON = os.path.join(KB_DIR, "concept_grade.json")
 CURRICULUM_JSONL = os.path.join(KB_DIR, "curriculum_junior.jsonl")
 
+#: Tier 2 可核验断言集目录（P1-1）。
+#: 与 data/kb/ 分开存放是刻意的：data/kb/ 装的是 K12-KGraph 衍生物
+#: （CC BY-NC-SA，不入库），而 Tier 2 断言为本项目自建（MIT），
+#: 必须入库以便复现与审计。
+ASSERTIONS_DIR = os.path.join("data", "assertions")
+
 CACHE_DIR = os.path.join("results", ".cache", "judge")
 
 
@@ -81,3 +87,17 @@ def kb_db() -> str:
 
 def grade_json() -> str:
     return resolve(GRADE_JSON)
+
+
+def assertions_dir() -> str:
+    return resolve(ASSERTIONS_DIR)
+
+
+def assertion_files() -> List[str]:
+    """断言集目录下的全部 *.jsonl（按文件名排序，保证装载顺序稳定）。"""
+    d = assertions_dir()
+    if not os.path.isdir(d):
+        return []
+    out = [os.path.join(d, n) for n in sorted(os.listdir(d))
+           if n.endswith(".jsonl")]
+    return out

@@ -1,0 +1,123 @@
+{
+  "topics": [
+    {
+      "topic": "有理数运算",
+      "no": 1,
+      "total": 15,
+      "verified": 14,
+      "unverified": 0,
+      "quarantined": 1
+    },
+    {
+      "topic": "整式的加减",
+      "no": 2,
+      "total": 10,
+      "verified": 7,
+      "unverified": 0,
+      "quarantined": 3
+    },
+    {
+      "topic": "一元一次方程",
+      "no": 3,
+      "total": 13,
+      "verified": 12,
+      "unverified": 0,
+      "quarantined": 1
+    },
+    {
+      "topic": "二元一次方程组",
+      "no": 4,
+      "total": 12,
+      "verified": 8,
+      "unverified": 0,
+      "quarantined": 4
+    },
+    {
+      "topic": "全等三角形",
+      "no": 5,
+      "total": 15,
+      "verified": 15,
+      "unverified": 0,
+      "quarantined": 0
+    },
+    {
+      "topic": "整式的乘法与因式分解",
+      "no": 6,
+      "total": 0,
+      "verified": 0,
+      "unverified": 0,
+      "quarantined": 0,
+      "entries": [],
+      "error": "生成失败：未解析出任何候选断言"
+    },
+    {
+      "topic": "分式",
+      "no": 7,
+      "total": 0,
+      "verified": 0,
+      "unverified": 0,
+      "quarantined": 0,
+      "entries": [],
+      "error": "生成失败：未解析出任何候选断言"
+    },
+    {
+      "topic": "勾股定理",
+      "no": 8,
+      "total": 10,
+      "verified": 9,
+      "unverified": 0,
+      "quarantined": 1
+    },
+    {
+      "topic": "一次函数",
+      "no": 9,
+      "total": 0,
+      "verified": 0,
+      "unverified": 0,
+      "quarantined": 0,
+      "entries": [],
+      "error": "生成失败：未解析出任何候选断言"
+    },
+    {
+      "topic": "一元二次方程",
+      "no": 10,
+      "total": 0,
+      "verified": 0,
+      "unverified": 0,
+      "quarantined": 0,
+      "entries": [],
+      "error": "生成失败：未解析出任何候选断言"
+    },
+    {
+      "topic": "二次函数",
+      "no": 11,
+      "total": 0,
+      "verified": 0,
+      "unverified": 0,
+      "quarantined": 0,
+      "entries": [],
+      "error": "生成失败：未解析出任何候选断言"
+    },
+    {
+      "topic": "相似三角形",
+      "no": 12,
+      "total": 12,
+      "verified": 12,
+      "unverified": 0,
+      "quarantined": 0
+    },
+    {
+      "topic": "锐角三角函数",
+      "no": 13,
+      "total": 0,
+      "verified": 0,
+      "unverified": 0,
+      "quarantined": 0,
+      "entries": [],
+      "error": "生成失败：未解析出任何候选断言"
+    }
+  ],
+  "total": 87,
+  "verified": 77,
+  "quarantined": 10
+}

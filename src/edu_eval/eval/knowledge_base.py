@@ -53,6 +53,8 @@ class KBEntry:
     tier: int = 1
     grade: str = ""
     aliases: List[str] = field(default_factory=list)
+    #: Tier 2 断言涉及的初中概念名（用于按概念召回，见 _lookup_all_by_name）
+    concepts: List[str] = field(default_factory=list)
 
     @property
     def text_blob(self) -> str:
@@ -102,6 +104,47 @@ class KnowledgeBase:
                 + "；".join(errors[:3])
             )
         return cls(entries)
+
+    @classmethod
+    def load_assertions(cls, dirpath: str) -> Tuple[List[KBEntry], List[str]]:
+        """装载 Tier 2 断言集目录下的全部 jsonl。
+
+        与 `load()` 的区别：断言集是**可选增强资产**，缺失时只告警不报错
+        （知识库主体 data/kb/knowledge.jsonl 缺失才是硬错误）。
+        只返回 `verification.status == verified` 的条目参与 G0 判定，
+        其余（unverified / quarantined）在此就被过滤掉。
+        """
+        import glob
+
+        entries: List[KBEntry] = []
+        warns: List[str] = []
+        files = sorted(glob.glob(os.path.join(dirpath, "*.jsonl")))
+        if not files:
+            warns.append(
+                f"断言集目录为空或不存在：{dirpath}"
+                "（运行 `python scripts/build_tier2_assertions.py --all` 生成）")
+            return entries, warns
+        for path in files:
+            try:
+                for obj in _read_jsonl(path):
+                    if int(obj.get("tier", 1) or 1) != 2:
+                        continue
+                    e = _adapt(obj)
+                    if e.quarantined:  # 未通过校验的断言不参与判定
+                        continue
+                    entries.append(e)
+            except (OSError, TypeError, ValueError) as e:
+                warns.append(f"断言文件装载失败 {os.path.basename(path)}：{e}")
+        if not entries:
+            warns.append(f"断言集未装载到任何可用条目：{dirpath}")
+        return entries, warns
+
+    def extend(self, entries: List[KBEntry]) -> None:
+        """追加条目（同 id 不覆盖，先入为主）。"""
+        for e in entries:
+            if e.id not in self._by_id:
+                self.entries.append(e)
+                self._by_id[e.id] = e
 
     @classmethod
     def load_safe(cls, path: str) -> Tuple[Optional["KnowledgeBase"], List[str]]:
@@ -157,9 +200,10 @@ class KnowledgeBase:
             found: Dict[str, KBEntry] = {}
             leftovers: List[str] = []
             for name in concept_names:
-                hit = self._lookup_by_name(name)
-                if hit:
-                    found[hit.id] = hit
+                hits = self._lookup_all_by_name(name)
+                if hits:
+                    for h in hits:
+                        found[h.id] = h
                 else:
                     leftovers.append(name)
             if len(found) >= top_k:
@@ -184,6 +228,24 @@ class KnowledgeBase:
                     break
         return list(hits.values())
 
+    def retrieve_assertions(self, concept_names: Optional[List[str]] = None,
+                            top_k: int = 8) -> List[KBEntry]:
+        """优先召回 Tier 2 可核验断言（G0 判定专用）。
+
+        G0 判定的关键证据是断言，而同一课题的断言条目共享同一个 topic 名，
+        在通用 `retrieve_for_text()` 里会被 Tier 1 概念条挤占
+        （实测 top_k=5 时等式性质断言被挡在上下文之外，导致本可判定的
+        断言被判 NE）。这里单独召回并按 tier 过滤，保证断言优先进入上下文。
+        """
+        out: Dict[str, KBEntry] = {}
+        for name in concept_names or []:
+            for e in self._lookup_all_by_name(name):
+                if e.tier == 2 and not e.quarantined:
+                    out[e.id] = e
+            if len(out) >= top_k:
+                break
+        return list(out.values())[:top_k]
+
     def _lookup_by_name(self, name: str) -> Optional[KBEntry]:
         for e in self.entries:
             if e.topic == name:
@@ -192,6 +254,21 @@ class KnowledgeBase:
             if name in e.aliases:
                 return e
         return None
+
+    def _lookup_all_by_name(self, name: str) -> List[KBEntry]:
+        """按概念名召回**全部**相关条目（topic / aliases / concepts）。
+
+        单条召回（`_lookup_by_name`）对 Tier 2 断言是错的：同一课题的多条
+        断言 topic 相同（如 15 条断言的 topic 都是「一元一次方程」），
+        只取首条会白白丢掉 14 条，G0 覆盖度被严重低估。
+        """
+        hits: List[KBEntry] = []
+        for e in self.entries:
+            if e.quarantined:
+                continue
+            if (e.topic == name or name in e.aliases or name in e.concepts):
+                hits.append(e)
+        return hits
 
     # ---------------------------------------------------------------- 输出
     def format_for_prompt(self, entries: List[KBEntry]) -> str:
@@ -228,6 +305,7 @@ def _adapt(obj: dict) -> KBEntry:
             applicable_to=raw.grade,
             quarantined=raw.quarantined or not raw.is_verified,
             tier=2, grade=raw.grade,
+            concepts=[str(c) for c in (obj.get("concepts") or []) if c],
         )
     raw1 = Tier1Entry.from_dict(obj)
     return KBEntry(
@@ -244,3 +322,14 @@ def _adapt(obj: dict) -> KBEntry:
 
 def _tokenize(text: str) -> List[str]:
     return _TOKEN_RE.findall((text or "").lower())
+
+
+def _read_jsonl(path: str) -> List[dict]:
+    """逐行读取 JSONL，跳过空行。"""
+    out: List[dict] = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                out.append(json.loads(line))
+    return out

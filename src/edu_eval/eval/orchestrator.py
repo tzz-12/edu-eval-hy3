@@ -23,6 +23,8 @@ import os
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from edu_eval.eval.knowledge_base import KBEntry
+
 from edu_eval.config import Hy3Config
 from edu_eval.hy3 import Hy3Client
 from edu_eval.kb.grade_map import GradeMap
@@ -38,6 +40,29 @@ from edu_eval.eval.judges.expression_safety import ExpressionSafetyJudge
 from edu_eval.eval.judges.review import ReviewJudge
 from edu_eval.eval.judges.arbitrate import ArbitrateJudge
 from edu_eval.eval.knowledge_base import KnowledgeBase
+
+
+def resolve_admission(declared: str, scores: Dict[str, Any]) -> str:
+    """按维度 2（G0）的**实际判定**推导准入结论，覆盖模型自述。
+
+    实测踩坑：模型会一边把维度 2 标 `ne=true`、证据写「无法核验」，一边自报
+    `admission=PASS`，直接采信就会出现「G0 无法核验却整体通过并给出总分」的
+    自相矛盾报告。量规（dimensions.py 维度 2 锚点）规定：
+    无法核验 → 整体 NE 且不生成总分；1–3 分 → FAIL。
+
+    纯函数，便于单测覆盖三种分支。
+    """
+    g0 = scores.get("2")
+    if not isinstance(g0, dict):
+        return declared
+    score = g0.get("score")
+    if g0.get("ne") or score is None:
+        return "NE"
+    if isinstance(score, bool):  # bool 是 int 子类，score 不可能是 True/False
+        return declared
+    if isinstance(score, (int, float)) and score <= 3:
+        return "FAIL"
+    return declared
 
 
 class Orchestrator:
@@ -139,6 +164,8 @@ class Orchestrator:
         redline = bool(fact.get("redline", False))
         scores.update(fact.get("scores", {}))
         suggestions.extend(fact.get("suggestions", []))
+
+        admission = resolve_admission(admission, scores)
 
         if admission != "PASS":
             report["admission"] = admission
@@ -262,8 +289,14 @@ class Orchestrator:
                 names = [h.name for h in self.retriever.search(text[:4000], top_k=8)]
             except Exception as e:  # 检索失败不应中断评测，但必须留痕
                 self.warnings.append(f"概念检索失败，知识库上下文降级：{type(e).__name__}")
-        entries = self.kb.retrieve_for_text(text[:4000], top_k=5,
+        # Tier 2 断言优先：G0 判定的关键证据，不能被 Tier 1 概念条挤占
+        entries: List[KBEntry] = []
+        if names:
+            entries.extend(self.kb.retrieve_assertions(names, top_k=8))
+        general = self.kb.retrieve_for_text(text[:4000], top_k=5,
                                             concept_names=names or None)
+        seen = {e.id for e in entries}
+        entries.extend(e for e in general if e.id not in seen)
         return len(entries), self.kb.format_for_prompt(entries)
 
 
@@ -283,6 +316,14 @@ def load_kb_assets(retriever_enabled: bool = True, warnings: Optional[List[str]]
 
     kb, kb_warns = KnowledgeBase.load_safe(P.kb_jsonl())
     warns.extend(kb_warns)
+
+    # Tier 2 断言集（P1-1）：可选增强资产，缺失只告警。
+    # 只有 verified 条目进入知识库，unverified / quarantined 已被过滤。
+    if kb is not None:
+        assertions, a_warns = KnowledgeBase.load_assertions(P.assertions_dir())
+        if assertions:
+            kb.extend(assertions)
+        warns.extend(a_warns)
 
     grade_json = P.grade_json()
     if os.path.exists(grade_json):

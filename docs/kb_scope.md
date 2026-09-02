@@ -85,6 +85,48 @@
    系统性假阳性。已通过 `src/edu_eval/kb/grade_exempt.json` 豁免，
    每条豁免均附教材依据，规则层会输出 `R-GRADE-EXEMPT` 留痕供审计。
 
+## 5.1 Tier 2 断言的生成与校验流水线（P1-1）
+
+断言由 Hy3 生成，但**生成 ≠ 可信**。每条断言必须过校验才能进入 G0：
+
+```text
+Hy3 生成候选断言（严格 JSON）
+        │
+        ├─ sympy 能算的（恒等式 / 公式 / 方程求根）── 真算
+        │     算对 → verified ｜ 找出反例 → quarantined ｜ 算不了 → unverified
+        │
+        └─ sympy 算不了的（结构性 / 性质类断言）
+              └─ 一致性复核：换独立提示让 Hy3 重新推导并尝试证伪
+                    判对 → verified ｜ 判错 → quarantined ｜ 没返回结论 → unverified
+```
+
+三态语义（务必分清，混淆会造成系统性误判）：
+
+| 状态 | 含义 | 对 G0 的影响 |
+|---|---|---|
+| `verified` | 通过确定性校验 | 参与判定 |
+| `unverified` | **未判定**（能力边界，不是通过） | 返回 NE |
+| `quarantined` | 校验发现错误，**断言其错误** | 隔离，永不参与 |
+
+两条设计红线（均来自实测教训）：
+
+1. **「没拿到复核结论」必须记为 `unverified`，绝不能记为 `quarantined`。**
+   前者只是承认判定不了，后者是断言该知识有错——首轮实现把缺结论当判错，
+   一次性误杀整批 10 条正确断言。
+2. **错误断言必须留痕而非静默丢弃。** 被 quarantined 的条目保留在文件中，
+   可审计"模型错在哪"，也是后续优化生成提示的输入。
+
+复核采用分批（≤6 条/批）+ 覆盖率不足自动重试，并对模型偶发的
+1-based `idx` 偏移做纠正。
+
+一键重建：
+
+```bash
+set -a; source .env; set +a
+PYTHONPATH=src python scripts/build_tier2_assertions.py --all \
+  --out data/assertions --summary data/assertions/summary.json
+```
+
 ## 6. 版本与许可
 
 见 `src/kb/sources.yaml`。关键约束：
