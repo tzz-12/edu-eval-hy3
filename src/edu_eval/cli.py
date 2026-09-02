@@ -37,7 +37,10 @@ def main(argv=None) -> int:
         os.environ["HY3_MOCK"] = "1"
     cfg = Hy3Config.from_env(require_key=not args.mock)
 
-    kb = KnowledgeBase.load(args.kb) if args.kb else KnowledgeBase([])
+    # 未指定 --kb 时传 None：由 evaluate() 统一装载知识库 + 年级映射 + 检索器。
+    # 此前传空 KnowledgeBase 会让 evaluate 走「用户已给 kb」分支，
+    # 年级映射与检索器被硬置 None，规则层静默失效（P0-10 · G）。
+    kb = KnowledgeBase.load(args.kb) if args.kb else None
     ctx = EvalContext(grade=args.grade or "", version=args.version or "",
                       topic=args.topic or "", period=args.period or "")
 

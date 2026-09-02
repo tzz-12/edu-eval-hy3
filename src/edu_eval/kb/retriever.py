@@ -37,17 +37,25 @@ FTS_MIN_SCORE = 8.0
 
 
 class KBRetriever:
-    def __init__(self, db_path: str = "data/kb/knowledge.db",
+    def __init__(self, db_path: Optional[str] = None,
                  jsonl_path: Optional[str] = None):
+        # 默认路径经 paths 解析，不依赖当前工作目录（P0-10 · G）
+        if db_path is None:
+            from edu_eval import paths as P
+
+            db_path = P.kb_db()
         if not os.path.exists(db_path):
             raise FileNotFoundError(
-                f"知识库索引 {db_path} 不存在，请先运行: python src/kb/ingest.py"
+                f"知识库索引 {db_path} 不存在，请先运行: python -m edu_eval.kb.ingest"
             )
         self.con = sqlite3.connect(db_path)
         self.con.row_factory = sqlite3.Row
         # 名称/别名精确与包含匹配用附属表（含 FTS 之外的原始字段）
-        self._load_names(jsonl_path or os.path.join(
-            os.path.dirname(db_path), "knowledge.jsonl"))
+        if jsonl_path is None:
+            from edu_eval import paths as P
+
+            jsonl_path = P.kb_jsonl()
+        self._load_names(jsonl_path)
         self._fts_space = _space  # 保留引用
 
     def _load_names(self, jsonl_path: str) -> None:

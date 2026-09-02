@@ -8,10 +8,19 @@
   GradeMap.within(concept_id, grade)   → 概念是否属于声明年级范围
   GradeMap.analyze(ids, declared)     → 超纲分析报告（维度 3 硬证据）
 
-语义约定：
-- 概念可跨册复现（如勾股定理 {八下, 九下}）。判断规则为
-  「概念册次集合 ∩ 声明允许册次集合 ≠ ∅」→ 在范围内。
-  复现即复习可用，符合教学实践；首次定义册次天然包含于集合。
+语义约定（P0-10 · D 修正）：
+- **超纲 ≠ 不在本册**。概念按册次**先后序号**比较，而不是集合求交：
+  取概念的**最早引入册次** `earliest` 与声明范围的**最晚册次** `latest`：
+    * `earliest <= latest` → 已引入（在范围内）
+    * `earliest >  latest` → 真超纲（尚未学到）
+- 修正前的实现用「概念册次集合 ∩ 声明册次集合 ≠ ∅」判断，把**早于**
+  声明年级的前置知识（九年级教案引用「有理数」）也判成了超纲：
+  声明年级越高，误判越多（九年级 319/451 = 71%），与真实超纲风险恰好相反。
+- 已引入的概念再细分为两类，供维度 3 / 维度 7 引用：
+    * `current` —— 落在声明册次范围内（本册新授或复现）
+    * `earlier` —— 早于声明册次范围（**前置知识/已学内容，属正常引用**）
+- 概念可跨册复现（如勾股定理 {八下, 九下}）：复现即复习可用，
+  首次定义册次天然是 `earliest`。
 - 未知概念（不在 Tier 1 中）不猜测：返回 unknown，由上层
   决定交由 LLM 或标记 NE。
 """
@@ -28,6 +37,13 @@ GRADE_ORDER = [
     "九年级上册", "九年级下册",
 ]
 GRADE_LEVEL = {g: i // 2 + 7 for i, g in enumerate(GRADE_ORDER)}  # → 7/8/9
+GRADE_INDEX = {g: i for i, g in enumerate(GRADE_ORDER)}           # 册次先后序号 0..5
+
+
+def grade_ordinal(grade: str) -> Optional[int]:
+    """册次在学程中的先后序号；非法册次返回 None（不猜测、不上取整）。"""
+    return GRADE_INDEX.get(grade)
+
 
 # 声明年级归一化：接受「七年级 / 初一 / 七上 / 7年级上册…」等写法
 _DECL_PATTERNS = [
@@ -71,7 +87,11 @@ class GradeMap:
         self.mapping = mapping
 
     @classmethod
-    def load(cls, path: str = "data/kb/concept_grade.json") -> "GradeMap":
+    def load(cls, path: Optional[str] = None) -> "GradeMap":
+        if path is None:
+            from edu_eval import paths as P  # 延迟导入：默认路径不依赖 cwd
+
+            path = P.grade_json()
         with open(path, encoding="utf-8") as f:
             return cls(json.load(f))
 
@@ -82,18 +102,50 @@ class GradeMap:
         rec = self.mapping.get(concept_id)
         return list(rec["grades"]) if rec else []
 
-    def within(self, concept_id: str, declared_grade: str) -> Optional[bool]:
-        """概念是否在声明年级范围内；未知概念返回 None。"""
+    def classify(self, concept_id: str, declared_grade: str) -> Optional[str]:
+        """判定单个概念相对声明年级的位置。
+
+        返回：
+          "current"  落在声明册次范围内（本册新授或复现）
+          "earlier"  早于声明范围 —— 前置知识 / 已学内容，**正常引用，不算超纲**
+          "beyond"   晚于声明范围 —— 真超纲（尚未学到）
+          None       未知概念，或声明年级不可解析（不猜测）
+        """
         rec = self.mapping.get(concept_id)
         if not rec:
             return None
         allowed = normalize_declared_grade(declared_grade)
         if not allowed:
             return None  # 声明不可解析 → 不猜测
-        return bool(set(rec["grades"]) & allowed)
+        latest = max(GRADE_INDEX[g] for g in allowed)
+        ordinals = [GRADE_INDEX[g] for g in rec["grades"] if g in GRADE_INDEX]
+        if not ordinals:
+            return None  # 概念册次全部非法 → 不猜测
+        earliest = min(ordinals)
+        if earliest > latest:
+            return "beyond"
+        return "current" if max(ordinals) >= min(GRADE_INDEX[g] for g in allowed) else "earlier"
+
+    def within(self, concept_id: str, declared_grade: str) -> Optional[bool]:
+        """概念在声明年级节点是否**已经引入**（不晚于声明）。
+
+        注意语义：返回 True 包含「本册内容」与「前置知识」两种情形。
+        需要区分二者请使用 classify()。未知概念 / 声明不可解析返回 None。
+        """
+        kind = self.classify(concept_id, declared_grade)
+        if kind is None:
+            return None
+        return kind != "beyond"
 
     def analyze(self, concept_ids: List[str], declared_grade: str) -> dict:
-        """维度 3 超纲分析：确定性、可追溯（每条结论附概念名与所属册次）。"""
+        """维度 3 超纲分析：确定性、可追溯（每条结论附概念名与所属册次）。
+
+        返回键：
+          within  已引入（= current + earlier，向后兼容旧调用方）
+          current 本册范围内
+          earlier 前置知识（早于声明范围，**不得据此判超纲**）
+          beyond  真超纲（概念最早引入册次晚于声明最晚册次）
+        """
         allowed = normalize_declared_grade(declared_grade)
         result = {
             "declared": declared_grade,
@@ -101,31 +153,48 @@ class GradeMap:
             "parse_ok": bool(allowed),
             "total": len(concept_ids),
             "known": 0, "unknown": 0,
-            "within": [], "beyond": [],
+            "within": [], "current": [], "earlier": [], "beyond": [],
         }
         if not allowed:
             result["error"] = "声明年级无法解析，维度 3 返回 NE"
             return result
+        earliest_allowed = min(GRADE_INDEX[g] for g in allowed)
+        latest_allowed = max(GRADE_INDEX[g] for g in allowed)
         for cid in concept_ids:
             rec = self.mapping.get(cid)
             if not rec:
                 result["unknown"] += 1
                 continue
             result["known"] += 1
-            item = {"id": cid, "name": rec["name"], "grades": rec["grades"]}
-            if set(rec["grades"]) & allowed:
-                result["within"].append(item)
-            else:
-                item["min_grade"] = min(rec["grades"], key=GRADE_ORDER.index)
+            ordinals = [GRADE_INDEX[g] for g in rec["grades"] if g in GRADE_INDEX]
+            item = {
+                "id": cid, "name": rec["name"], "grades": rec["grades"],
+                "earliest_grade": (GRADE_ORDER[min(ordinals)] if ordinals else ""),
+            }
+            kind = self.classify(cid, declared_grade)
+            if kind is None:
+                # 概念册次全部非法：无法判定，计入 unknown 而**不**计入超纲
+                result["unknown"] += 1
+                result["known"] -= 1
+                continue
+            result["within"].append(item)
+            if kind == "beyond":
                 result["beyond"].append(item)
+            elif kind == "current":
+                result["current"].append(item)
+            else:
+                result["earlier"].append(item)
+        result["allowed_range"] = [GRADE_ORDER[earliest_allowed],
+                                   GRADE_ORDER[latest_allowed]]
         return result
 
 
 def build(raw_path: str, jsonl_path: str, out_path: str) -> dict:
     """从 Tier 1 JSONL + 原始图谱（章节信息）构建映射表。"""
-    sys_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if not os.path.isabs(raw_path):
-        raw_path = os.path.join(sys_dir, os.pardir, raw_path) if not os.path.exists(raw_path) else raw_path
+    from edu_eval import paths as P  # 延迟导入：避免与 paths 的循环依赖
+
+    raw_path = P.resolve(raw_path)
+    jsonl_path = P.resolve(jsonl_path)
     with open(raw_path, encoding="utf-8") as f:
         g = json.load(f)
     nodes, edges = g["nodes"], g["edges"]
@@ -179,10 +248,12 @@ def build(raw_path: str, jsonl_path: str, out_path: str) -> dict:
 
 
 if __name__ == "__main__":
-    # 在仓库根目录运行：python -m edu_eval.kb.grade_map
-    mapping = build("data/raw/k12_math.json",
-                    "data/kb/knowledge.jsonl",
-                    "data/kb/concept_grade.json")
+    from edu_eval import paths as P
+
+    # 任意目录运行均可：python -m edu_eval.kb.grade_map
+    mapping = build(P.resolve(os.path.join("data", "raw", "k12_math.json")),
+                    P.kb_jsonl(),
+                    P.grade_json())
 
     mapped = sum(1 for v in mapping.values() if v["grades"])
     print(f"映射表：{len(mapping)} 概念，其中年级可映射 {mapped} "
@@ -193,7 +264,7 @@ if __name__ == "__main__":
         print(f"  {g}: {cnt.get(g, 0)}")
 
     # 性能与语义自测
-    out = "data/kb/concept_grade.json"
+    out = P.grade_json()
     gm = GradeMap.load(out)
     t0 = time.perf_counter()
     for _ in range(1000):
@@ -201,14 +272,36 @@ if __name__ == "__main__":
     dt = (time.perf_counter() - t0) / 1000 * 1000
     print(f"单条查询耗时：{dt:.3f} ms（要求 <10ms）")
 
-    # 超纲语义抽查：一元二次方程（九上）出现在七年级设计中 → 超纲
-    x = next(cid for cid, v in mapping.items() if v["name"] == "一元二次方程")
+    def cid_of(name: str) -> str:
+        return next(cid for cid, v in mapping.items() if v["name"] == name)
+
+    # --- 超纲方向：概念晚于声明 ---
+    x = cid_of("一元二次方程")                       # 九上
     assert gm.within(x, "九年级") is True
     assert gm.within(x, "七年级") is False
-    # 勾股定理跨册复现 {八下,九下}：八年级 / 九年级均不超纲
-    gpt = next(cid for cid, v in mapping.items() if v["name"] == "勾股定理")
+    assert gm.classify(x, "七年级") == "beyond"
+    # 勾股定理跨册复现 {八下,九下}：八年级 / 九年级均不超纲，七年级超纲
+    gpt = cid_of("勾股定理")
     assert gm.within(gpt, "八年级") is True and gm.within(gpt, "九年级") is True
     assert gm.within(gpt, "七年级") is False
+
+    # --- 反向：概念早于声明 = 前置知识，不得判超纲（P0-10 · D 回归）---
+    yls = cid_of("有理数")                           # 七上
+    assert gm.classify(yls, "九年级") == "earlier", "前置知识被误判为超纲"
+    assert gm.within(yls, "九年级") is True
+    assert gm.classify(yls, "七年级") == "current"
+    # 九年级声明下，七~八年级概念一个都不该进 beyond
+    rep9 = gm.analyze(list(mapping), "九年级")
+    earlier_names = {i["name"] for i in rep9["earlier"]}
+    beyond_names = {i["name"] for i in rep9["beyond"]}
+    assert not (earlier_names & beyond_names), "同一概念同时进 earlier 与 beyond"
+    assert "有理数" not in beyond_names and "有理数" in earlier_names
+    # 单调性：声明年级越高，被判超纲的概念只能越少（不能变多）
+    counts = [len(gm.analyze(list(mapping), g)["beyond"])
+              for g in ("七年级", "八年级", "九年级")]
+    assert counts[0] >= counts[1] >= counts[2], f"超纲数随年级升高而增加：{counts}"
+    print(f"  超纲概念数 七/八/九年级：{counts}（应单调不增）")
+
     # 声明归一化
     assert normalize_declared_grade("初一") == {"七年级上册", "七年级下册"}
     assert normalize_declared_grade("8年级上册") == {"八年级上册"}

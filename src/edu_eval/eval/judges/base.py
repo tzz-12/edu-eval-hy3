@@ -27,18 +27,26 @@ class BaseJudge:
         """执行判定（带缓存与 JSON 解析兜底）。
 
         rule_evidence：规则层（零 LLM）的确定性判定，作为硬证据注入提示。
-        """
-        key = cache_key(text, self.role, self.client.cfg.temperature,
-                        self.client.cfg.model, rule_evidence)
-        if self.cache and self.cache.get(key):
-            return self.cache.get(key)
 
+        缓存键对**渲染后的完整提示**取哈希（P0-10 · E）：先建提示再查缓存，
+        这样 kb_context / rule_evidence / context 中任何一项变化都会自动换键，
+        不会因新增输入维度而漏键串味。
+        """
         user = self.build_user_prompt(text, context, kb_context, rule_evidence)
+        if self.cache:
+            key = cache_key(self.role, self.client.cfg.temperature,
+                            self.client.cfg.model, self.system, user, context)
+            cached = self.cache.get(key)
+            if cached is not None:
+                return cached
+        else:
+            key = None
+
         raw = self.client.judge(self.system, user)
         data = self._parse_json(raw)
         data["_meta"] = {"role": self.role, "prompt_version": PROMPT_VERSION}
 
-        if self.cache:
+        if self.cache and key:
             self.cache.put(key, data)
         return data
 

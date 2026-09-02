@@ -112,18 +112,33 @@ def _render_report(report, filename: str) -> str:
                   if total is not None else
                   f'<div class="total" style="font-size:22px;color:#8b949e">—</div>')
 
-    # 规则层发现
+    # 规则层发现（P0-10 · B：直接消费结构化 rules，不再从 suggestions 反推）
     rules_html = ""
-    rule_rep = None
-    # d 不含 rules（Report 兼容外壳）；从 parse notes 展示解析信息
-    fails, warns = [], []
-    for s in d.get("suggestions", []):
-        if "规则层检出" in s:
-            fails.append(s)
-    if fails:
-        fails_html = "".join(f'<div class="fail-ev">{html.escape(f)}</div>'
-                             for f in fails)
-        rules_html += f'<div class="card"><h3>规则层确定性检查</h3>{fails_html}</div>'
+    rule_rep = d.get("rules") or {}
+    rule_findings = rule_rep.get("findings") or []
+    if rule_findings or rule_rep.get("g0_rule_verdict"):
+        rows = []
+        mark = {"fail": ("✗", "#cf222e"), "warn": ("△", "#9a6700"),
+                "ne": ("·", "#8b949e"), "pass": ("✓", "#1a7f37")}
+        for f in rule_findings:
+            sym, color = mark.get(f.get("verdict"), ("·", "#8b949e"))
+            ev = html.escape((f.get("evidence") or
+                              (f.get("detail") or {}).get("reason") or "")[:200])
+            rows.append(
+                f'<div class="ev" style="border-left-color:{color}">'
+                f'<b style="color:{color}">{sym} {html.escape(f.get("rule_id", ""))}</b>'
+                f"　{ev}</div>")
+        g0 = rule_rep.get("g0_rule_verdict", "NE")
+        rules_html = (
+            f'<div class="card"><h3>规则层确定性检查（零 LLM）'
+            f'　G0：{html.escape(str(g0))}</h3>{"".join(rows)}</div>')
+
+    # 环境告警（P0-10 · A/G：静默降级改为显式提示）
+    warns = d.get("warnings") or []
+    if warns:
+        w_html = "".join(f'<div class="warn" style="margin:6px 0">⚠ {html.escape(w)}</div>'
+                         for w in warns)
+        rules_html += f'<div class="card"><h3>环境告警</h3>{w_html}</div>'
 
     # 维度卡片
     cards = []
@@ -149,7 +164,7 @@ def _render_report(report, filename: str) -> str:
 
     radar = radar_svg(d.get("scores", {}))
     suggestions = "".join(f"<li>{html.escape(s)}</li>"
-                          for s in d.get("suggestions", []) if "规则层检出" not in s)
+                          for s in d.get("suggestions", []))
     arbitration = (f'<p class="muted">仲裁维度：{", ".join(d["arbitration"])}</p>'
                    if d.get("arbitration") else "")
     p = d.get("parse", {})

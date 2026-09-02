@@ -1,8 +1,26 @@
 """Judge 调用磁盘缓存。
 
-命中键 = sha256(样本内容 hash + judge 角色 + 提示版本 + 温度 + 模型名)。
+命中键 = sha256(提示版本 + judge 角色 + 温度 + 模型 + **完整渲染后的 system/user 提示**
+                + 规范化后的 context)。
+
 效果：测试—重测稳定性实验中相同输入零成本复用；不同温度/提示版本不串味。
 缓存目录 results/.cache/judge/（已 gitignore）。
+
+P0-10 · E 修复
+--------------
+早期版本只对 `text + role + temperature + model + rule_evidence` 取哈希，漏掉了
+两项会影响 Judge 判断的输入：
+
+* `kb_context` —— 注入提示的知识库条目；
+* `context`    —— 用户声明的年级 / 版本 / 课题 / 课时。
+
+后果（实测）：同一份文本先按七年级跑、再按九年级跑，第二次**全部命中第一次的
+缓存**，于是「声明年级与实际内容不一致 → 质量风险信号」这一核心设计直接失效，
+且实验数据无法复现。
+
+修法不是把漏掉的字段逐个补进参数列表（下次再加输入还会漏），而是改为
+**对最终渲染出的完整提示取哈希**：任何进入提示的内容自动进入缓存键。
+`context` 另外显式参与一次，用于兜住「传入但未渲染进提示」的元数据。
 """
 from __future__ import annotations
 
@@ -11,25 +29,38 @@ import json
 import os
 from typing import Any, Optional
 
-PROMPT_VERSION = "v1"  # 提示词改动时递增，自动失效旧缓存
-CACHE_DIR = os.path.join("results", ".cache", "judge")
+PROMPT_VERSION = "v2"  # 提示词/缓存键口径改动时递增，自动失效旧缓存
 
 
-def cache_key(text: str, role: str, temperature: float, model: str,
-              rule_evidence: str = "") -> str:
-    """rule_evidence 必须参与哈希：同一段正文在不同规则判定下，
-    Judge 看到的证据不同，若共用一个缓存会串味。"""
+def _stable(obj: Any) -> Any:
+    """把任意结构规整为可稳定序列化的形式（字典按键排序）。"""
+    if isinstance(obj, dict):
+        return {str(k): _stable(v) for k, v in sorted(obj.items(), key=lambda kv: str(kv[0]))}
+    if isinstance(obj, (list, tuple)):
+        return [_stable(v) for v in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    return repr(obj)
+
+
+def cache_key(role: str, temperature: float, model: str,
+              system_prompt: str, user_prompt: str,
+              context: Optional[Any] = None) -> str:
+    """对**完整渲染后的提示**取哈希，杜绝「新输入忘了进键」的串味。"""
     payload = json.dumps(
-        [PROMPT_VERSION, role, temperature, model, text, rule_evidence],
+        [PROMPT_VERSION, role, temperature, model,
+         system_prompt, user_prompt, _stable(context)],
         ensure_ascii=False, sort_keys=True,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class JudgeCache:
-    def __init__(self, enabled: bool = True, cache_dir: str = CACHE_DIR):
+    def __init__(self, enabled: bool = True, cache_dir: Optional[str] = None):
+        from .. import paths as P  # 延迟导入：避免与 paths 形成循环依赖
+
         self.enabled = enabled
-        self.cache_dir = cache_dir
+        self.cache_dir = cache_dir or P.cache_dir()
         self.hits = 0
         self.misses = 0
 

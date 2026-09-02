@@ -34,6 +34,10 @@ class Report:
     parse: Dict[str, Any] = field(default_factory=dict)
     arbitration: List[str] = field(default_factory=list)
     kb_hits: int = 0
+    #: P0-10 · B：规则层结构化结果不再被外壳丢弃（fail/warn/ne 全量留痕）
+    rules: Dict[str, Any] = field(default_factory=dict)
+    #: P0-10 · G/A：资产装载与环境告警（替代此前的静默降级）
+    warnings: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -45,6 +49,8 @@ class Report:
             "parse": self.parse,
             "arbitration": self.arbitration,
             "kb_hits": self.kb_hits,
+            "rules": self.rules,
+            "warnings": self.warnings,
         }
 
     def to_text(self) -> str:
@@ -72,6 +78,22 @@ class Report:
             lines.append(f"总评结论：{agg.get('verdict')}（{agg.get('reason','')}）")
         if self.arbitration:
             lines.append(f"需仲裁维度：{', '.join(self.arbitration)}")
+        # P0-10 · B：规则层确定性结论进入文本报告
+        rules = self.rules or {}
+        if rules:
+            lines.append("-" * 48)
+            lines.append(f"规则层（零 LLM）：G0 判定 {rules.get('g0_rule_verdict', 'NE')}，"
+                         f"共 {len(rules.get('findings', []))} 条发现")
+            for f in rules.get("findings", []):
+                mark = {"fail": "✗", "warn": "△", "ne": "·", "pass": "✓"}.get(
+                    f.get("verdict"), "·")
+                ev = (f.get("evidence") or f.get("reason") or "")[:80]
+                lines.append(f"  {mark} [{f.get('rule_id')}] {ev}")
+        if self.warnings:
+            lines.append("-" * 48)
+            lines.append("环境告警：")
+            for w in self.warnings:
+                lines.append(f"  ! {w}")
         if self.suggestions:
             lines.append("-" * 48)
             lines.append("改进建议：")
@@ -83,17 +105,24 @@ class Report:
 
 def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
              kb: Optional[KnowledgeBase] = None) -> Report:
+    """评估入口。
+
+    P0-10 修复：
+    - 适配 load_kb_assets 的新签名（返回 4 元组，含告警列表）；
+    - kb 参数仅覆盖知识库本体，年级映射与检索器**始终装载**——
+      此前传入 kb 时 gm/retriever 被硬置 None，规则层静默失效。
+    """
     ctx = ctx or EvalContext()
-    if kb is None:
-        kb, gm, retriever = load_kb_assets()
-    else:
-        gm, retriever = None, None
+    kb_loaded, gm, retriever, warns = load_kb_assets()
+    if kb is not None:
+        kb_loaded = kb
 
     parsed: ParsedDoc = parse_file(path)
     context = {"grade": ctx.grade, "version": ctx.version,
                "topic": ctx.topic, "period": ctx.period}
 
-    orch = Orchestrator(cfg, kb=kb, grade_map=gm, retriever=retriever)
+    orch = Orchestrator(cfg, kb=kb_loaded, grade_map=gm, retriever=retriever,
+                        warnings=warns)
     result = orch.run(parsed, context)
     return _to_report(result)
 
@@ -108,6 +137,8 @@ def _to_report(result: Dict[str, Any]) -> Report:
         parse=result["parse"],
         arbitration=result.get("arbitration", []),
         kb_hits=result.get("kb_hits", 0),
+        rules=result.get("rules") or {},
+        warnings=result.get("warnings") or [],
     )
 
 

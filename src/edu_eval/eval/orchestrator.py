@@ -7,12 +7,20 @@ P0-7 相比旧 run_eval.evaluate 的增强：
 3. 五类 Judge 拆分（judges/*），带磁盘缓存。
 4. 复核确定性预检（证据是否在原文）+ LLM 仲裁兜底。
 
+P0-10 修复：
+· A  知识库装载失败不再静默降级，改为记录到 report["warnings"]；
+· B  规则层的结构化结果 report["rules"] 不再在 Report 外壳里被丢掉；
+· C  kb_hits 计算不再依赖 `x and len(...) or 0` 这种类型不稳定的写法；
+· E  缓存键改为对完整渲染提示取哈希（见 cache.py）；
+· G  知识库与缓存路径经 paths.py 解析，不再依赖当前工作目录。
+
 run_eval.evaluate 保持向后兼容：内部委托本编排器。
 """
 from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from typing import Any, Dict, List, Optional
 
 from edu_eval.config import Hy3Config
@@ -36,7 +44,8 @@ class Orchestrator:
     def __init__(self, cfg: Hy3Config, kb: Optional[KnowledgeBase] = None,
                  grade_map: Optional[GradeMap] = None,
                  retriever: Optional[KBRetriever] = None,
-                 use_cache: bool = True):
+                 use_cache: bool = True,
+                 warnings: Optional[List[str]] = None):
         self.cfg = cfg
         self.client = Hy3Client(cfg)
         self.kb = kb or KnowledgeBase([])
@@ -44,6 +53,19 @@ class Orchestrator:
         self.retriever = retriever
         self.cache = JudgeCache(enabled=use_cache)
         self.rules = RuleEngine(grade_map=grade_map, retriever=retriever)
+        #: 环境与资产装载告警（替代此前的静默降级）
+        self.warnings: List[str] = list(warnings or [])
+        if grade_map is None:
+            self.warnings.append(
+                "年级映射表未加载：学段适配（维度 3）的确定性证据不可用，"
+                "相关判定退化为 NE。请运行 `python -m edu_eval.kb.grade_map` 重建。")
+        if retriever is None:
+            self.warnings.append(
+                "概念检索器未加载：无法从正文抽取概念，年级比对与知识库上下文将受限。"
+                "请运行 `python -m edu_eval.kb.ingest` 重建。")
+        if not self.kb.entries:
+            self.warnings.append(
+                "知识库为空：fact Judge 缺少可引用的条目，G0 判定退化为 NE。")
 
         self.j_fact = FactJudge(self.client, self.cache)
         self.j_design = DesignJudge(self.client, self.cache)
@@ -63,6 +85,7 @@ class Orchestrator:
             "rules": None, "admission": "NE", "redline": False,
             "scores": {}, "suggestions": [], "aggregation": {},
             "arbitration": [], "kb_hits": 0,
+            "warnings": list(self.warnings),
             "cache_stats": self.cache.stats(),
         }
         text = parsed.text
@@ -70,6 +93,7 @@ class Orchestrator:
         # 0) 解析不可靠 → NE（不猜测）
         if parsed.parse_status == "ocr_required" or not text.strip():
             report["aggregation"] = aggregate("NE", False, {})
+            report["warnings"] = list(self.warnings)
             return report
 
         # 1) 规则层（确定性，零 LLM）
@@ -94,17 +118,18 @@ class Orchestrator:
             suggestions = [f"规则层检出确定性知识错误：{f['evidence']}" for f in fails]
             report["suggestions"] = suggestions
             report["aggregation"] = aggregate("FAIL", False, {})
+            report["warnings"] = list(self.warnings)
             return report
 
         # 3) 事实 Judge（G0 + 维度 3）
         #    规则层的确定性判定作为硬证据注入，否则维度 3 完全依赖 LLM，
         #    规则层已算出的超纲结论被浪费。
-        kb_context = self._kb_context(text)
+        kb_hits, kb_context = self._kb_context(text)
         rule_evidence = self._format_rule_evidence(rule_rep)
         fact = self.j_fact.run(text, context, kb_context=kb_context,
                               rule_evidence=rule_evidence)
         fact = self.j_fact.normalize(fact)
-        report["kb_hits"] = self.kb.entries and len(self.kb.retrieve(text, top_k=5)) or 0
+        report["kb_hits"] = kb_hits
         admission = fact.get("admission", "PASS")
         redline = bool(fact.get("redline", False))
         scores.update(fact.get("scores", {}))
@@ -116,6 +141,7 @@ class Orchestrator:
             report["scores"] = scores
             report["suggestions"] = suggestions
             report["aggregation"] = aggregate(admission, redline, scores)
+            report["warnings"] = list(self.warnings)
             return report
 
         # 4) 教学设计 Judge + 表达与安全 Judge
@@ -159,6 +185,7 @@ class Orchestrator:
         report["suggestions"] = suggestions
         report["aggregation"] = aggregate("PASS", redline, scores)
         report["cache_stats"] = self.cache.stats()
+        report["warnings"] = list(self.warnings)
         return report
 
     # ------------------------------------------------------------------
@@ -195,36 +222,76 @@ class Orchestrator:
                     lines.append(f"- 豁免（图谱收录偏差，不作为超纲依据）：{ev}")
                 elif rid == "R-GRADE" and verdict == "ne":
                     lines.append(f"- 年级判定不可用：{ev}")
+                # 前置知识是**正向信号**：明确告诉 Judge 不要据此判超纲
+                # （P0-10 · D：早于声明年级的概念曾被误判为超纲）
+                if rid in ("R-GRADE-EXPL", "R-GRADE-ASSOC"):
+                    earlier = (f.get("detail") or {}).get("analysis", {}).get("earlier")
+                    if earlier:
+                        names = "、".join(i["name"] for i in earlier[:6])
+                        lines.append(
+                            f"- 前置知识（早于声明年级，属正常引用，"
+                            f"**不得据此判超纲**）：{names}")
             elif rid == "R-FORMULA" and verdict == "pass":
                 lines.append(f"- 公式核验通过：{ev}")
         return "\n".join(lines)
 
-    def _kb_context(self, text: str) -> str:
+    def _kb_context(self, text: str):
+        """构建给 fact Judge 的知识库上下文。
+
+        返回 (命中条数, 提示文本)。
+        优先用概念检索器召回的概念名查表；没有检索器时退回「在正文中查找
+        知识条目名称」。绝不把整篇文档当查询 —— 那样词元集合过大，
+        top_k 会退化为随机抽样。
+        """
         if not self.kb.entries:
-            return ""
-        return self.kb.format_for_prompt(self.kb.retrieve(text, top_k=5))
+            return 0, ""
+        names: List[str] = []
+        if self.retriever is not None:
+            try:
+                names = [h.name for h in self.retriever.search(text[:4000], top_k=8)]
+            except Exception as e:  # 检索失败不应中断评测，但必须留痕
+                self.warnings.append(f"概念检索失败，知识库上下文降级：{type(e).__name__}")
+        entries = self.kb.retrieve_for_text(text[:4000], top_k=5,
+                                            concept_names=names or None)
+        return len(entries), self.kb.format_for_prompt(entries)
 
 
-def load_kb_assets(retriever_enabled: bool = True):
-    """加载知识库资产（缺失时优雅降级为 None）。"""
+def load_kb_assets(retriever_enabled: bool = True, warnings: Optional[List[str]] = None):
+    """加载知识库资产。
+
+    P0-10 · A/G 修复：
+    · 路径经 paths.py 解析，**不再依赖当前工作目录**；
+    · 装载失败不再静默降级为 None，而是把原因写入 warnings 返回给调用方。
+    """
+    from .. import paths as P
+
+    warns: List[str] = list(warnings or [])
     kb = None
     gm = None
     retriever = None
-    jsonl = os.path.join("data", "kb", "knowledge.jsonl")
-    if os.path.exists(jsonl):
-        try:
-            kb = KnowledgeBase.load(jsonl)
-        except Exception:
-            kb = None
-    grade_json = os.path.join("data", "kb", "concept_grade.json")
+
+    kb, kb_warns = KnowledgeBase.load_safe(P.kb_jsonl())
+    warns.extend(kb_warns)
+
+    grade_json = P.grade_json()
     if os.path.exists(grade_json):
         try:
             gm = GradeMap.load(grade_json)
-        except Exception:
-            gm = None
-    if retriever_enabled and os.path.exists(os.path.join("data", "kb", "knowledge.db")):
-        try:
-            retriever = KBRetriever(os.path.join("data", "kb", "knowledge.db"), jsonl)
-        except Exception:
-            retriever = None
-    return kb, gm, retriever
+        except (OSError, ValueError, json.JSONDecodeError) as e:
+            warns.append(f"年级映射表装载失败：{e}")
+    else:
+        warns.append(f"年级映射表不存在：{grade_json}"
+                     f"（请运行 `python -m edu_eval.kb.grade_map` 重建）")
+
+    db_path = P.kb_db()
+    if retriever_enabled:
+        if os.path.exists(db_path):
+            try:
+                retriever = KBRetriever(db_path, P.kb_jsonl())
+            except (OSError, sqlite3.Error, ValueError) as e:
+                warns.append(f"概念检索器装载失败：{e}")
+        else:
+            warns.append(f"检索索引不存在：{db_path}"
+                         f"（请运行 `python -m edu_eval.kb.ingest` 重建）")
+
+    return kb, gm, retriever, warns

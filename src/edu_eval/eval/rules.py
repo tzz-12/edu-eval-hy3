@@ -317,9 +317,13 @@ class RuleEngine:
 
         formula_fails = [f for f in findings
                          if f.rule_id == "R-FORMULA" and f.verdict == "fail"]
+        # P0-10 · H：实际规则 id 是 R-GRADE-EXPL / R-GRADE-ASSOC / R-GRADE，
+        # 精确匹配 "R-GRADE" 恒为空 → 改为前缀匹配，summary 不再输出恒 0 的死指标
         grade_fail = [f for f in findings
-                      if f.rule_id == "R-GRADE" and f.verdict == "fail"]
-        # 规则层结论：任一公式错误 → G0 直接 FAIL（红线一票否决）
+                      if f.rule_id.startswith("R-GRADE") and f.verdict == "fail"]
+        # 规则层结论：任一公式错误 → G0 直接 FAIL（红线一票否决）。
+        # 注：显式超纲（R-GRADE-EXPL fail）不升级 G0 —— 超纲属维度 3 扣分项，
+        # 是否构成知识错误由 fact Judge 结合该硬证据裁定。
         g0_verdict = "FAIL" if formula_fails else "NE"
         return {
             "g0_rule_verdict": g0_verdict,
@@ -365,7 +369,9 @@ if __name__ == "__main__":
     r_good = engine.evaluate(good, declared_grade="八年级")
 
     # R-GRADE 联合演示：七年级设计中出现「一元二次方程」（九年级上册）
-    gm = GradeMap.load("data/kb/concept_grade.json")
+    from edu_eval import paths as P
+
+    gm = GradeMap.load(P.grade_json())
     x2 = next(cid for cid, v in gm.mapping.items() if v["name"] == "一元二次方程")
     g7 = next(cid for cid, v in gm.mapping.items() if v["name"] == "有理数")
     engine2 = RuleEngine(grade_map=gm)
