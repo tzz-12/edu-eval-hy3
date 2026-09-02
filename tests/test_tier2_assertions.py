@@ -171,8 +171,15 @@ def test_resolve_admission(scores, expected):
     assert resolve_admission(declared, scores) == expected
 
 
-def test_resolve_admission_without_g0_keeps_declared():
-    assert resolve_admission("PASS", {}) == "PASS"
+def test_resolve_admission_without_g0_forces_ne():
+    """维度 2 缺失（模型自报 PASS 却没给 G0 判定）= 无法核验 → 整体 NE。
+
+    实测：FactJudge 返回 admission=PASS 且 scores 里没有维度 2，
+    旧逻辑 `not isinstance(g0, dict) → 保留自述` 让矛盾报告漏过。
+    """
+    assert resolve_admission("PASS", {}) == "NE"
+    # 维度 2 存在且为非 dict 值同样按 NE 处理
+    assert resolve_admission("PASS", {"2": "ok"}) == "NE"
 
 
 def test_topic_lookup():

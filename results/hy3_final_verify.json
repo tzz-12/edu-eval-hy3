@@ -1,0 +1,263 @@
+{
+  "admission": "FAIL",
+  "redline": true,
+  "scores": {
+    "2": {
+      "score": 3,
+      "evidence": "新知讲授环节板书 'a+c=b+c 与 ac=bc(c≠0)'，其中 ac=bc 对任意数 c 成立，加法 c≠0 限制错误（参见 KB#as-03-015 等式性质2乘法无c≠0要求），属孤立知识/适用条件错误",
+      "ne": false
+    },
+    "3": {
+      "score": 5,
+      "evidence": "声明七年级人教版一元一次方程；原文概念：有理数运算(KB#as-01-001)、等式性质(KB#as-03-014,015)、一元一次方程(KB#math_7a_rjb_cpt41,KB#as-03-002)、解方程2x+3=11均在七年级范围；规则层判定显式概念均在声明年级内无超纲；学情分析前置基础并设认知阶梯(导入-讲授-例题-练习-探究)，适度拓展平方问题，高度匹配",
+      "ne": false
+    }
+  },
+  "suggestions": [
+    "修正板书等式性质2的表达：应区分乘法 ac=bc (c为任意数) 与除法 a/c=b/c (c≠0)，避免错误限制"
+  ],
+  "aggregation": {
+    "verdict": "不通过",
+    "total_score": null,
+    "grade": null,
+    "reason": "知识正确性准入为 FAIL：存在确认的知识错误。"
+  },
+  "parse": {
+    "parse_status": "ok",
+    "parse_confidence": 0.98,
+    "notes": ""
+  },
+  "arbitration": [],
+  "kb_hits": 18,
+  "rules": {
+    "g0_rule_verdict": "NE",
+    "summary": {
+      "formula_checked": 0,
+      "formula_failed": 0,
+      "grade_failed": 0,
+      "structure_missing": 2
+    },
+    "findings": [
+      {
+        "rule_id": "R-GRADE-EXEMPT",
+        "verdict": "ne",
+        "evidence": "代数式",
+        "detail": {
+          "reason": "图谱收录偏差已核实，不作为超纲判据",
+          "detail": [
+            {
+              "name": "代数式",
+              "graph_grades": [
+                "八年级下册"
+              ],
+              "actual_introduced": "七年级上册",
+              "status": "confirmed",
+              "reason": "人教版七上第二章《整式的加减》2.1『用字母表示数』即引入代数式；图谱仅在八下第十六章二次根式收录该节点，属收录偏差而非真实超纲。",
+              "evidence": "人教版数学七年级上册 第二章 2.1 整式"
+            }
+          ]
+        }
+      },
+      {
+        "rule_id": "R-GRADE-EXPL",
+        "verdict": "pass",
+        "evidence": "七年级",
+        "detail": {
+          "analysis": {
+            "declared": "七年级",
+            "allowed": [
+              "七年级上册",
+              "七年级下册"
+            ],
+            "parse_ok": true,
+            "total": 5,
+            "known": 5,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_7a_rjb_cpt41",
+                "name": "一元一次方程",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt56",
+                "name": "相等关系",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt6",
+                "name": "有理数",
+                "grades": [
+                  "七年级上册",
+                  "七年级下册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt42",
+                "name": "未知数",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7b_rjb_cpt57",
+                "name": "不等式",
+                "grades": [
+                  "七年级下册"
+                ],
+                "earliest_grade": "七年级下册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_7a_rjb_cpt41",
+                "name": "一元一次方程",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt56",
+                "name": "相等关系",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt6",
+                "name": "有理数",
+                "grades": [
+                  "七年级上册",
+                  "七年级下册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt42",
+                "name": "未知数",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7b_rjb_cpt57",
+                "name": "不等式",
+                "grades": [
+                  "七年级下册"
+                ],
+                "earliest_grade": "七年级下册"
+              }
+            ],
+            "earlier": [],
+            "beyond": [],
+            "allowed_range": [
+              "七年级上册",
+              "七年级下册"
+            ]
+          },
+          "n_concepts": 5
+        }
+      },
+      {
+        "rule_id": "R-GRADE-ASSOC",
+        "verdict": "pass",
+        "evidence": "七年级",
+        "detail": {
+          "analysis": {
+            "declared": "七年级",
+            "allowed": [
+              "七年级上册",
+              "七年级下册"
+            ],
+            "parse_ok": true,
+            "total": 2,
+            "known": 2,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_7a_rjb_cpt44",
+                "name": "等式",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt47",
+                "name": "移项",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_7a_rjb_cpt44",
+                "name": "等式",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt47",
+                "name": "移项",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              }
+            ],
+            "earlier": [],
+            "beyond": [],
+            "allowed_range": [
+              "七年级上册",
+              "七年级下册"
+            ]
+          },
+          "n_concepts": 2
+        }
+      },
+      {
+        "rule_id": "R-STRUCT",
+        "verdict": "warn",
+        "evidence": "未检出「重难点」章节",
+        "detail": {
+          "missing": "重难点",
+          "keywords": [
+            "教学重点",
+            "教学难点",
+            "重难点"
+          ]
+        }
+      },
+      {
+        "rule_id": "R-STRUCT",
+        "verdict": "warn",
+        "evidence": "未检出「作业设计」章节",
+        "detail": {
+          "missing": "作业设计",
+          "keywords": [
+            "作业布置",
+            "课后作业",
+            "作业设计",
+            "布置作业"
+          ]
+        }
+      }
+    ]
+  },
+  "warnings": []
+}

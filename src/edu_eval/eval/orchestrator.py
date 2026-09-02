@@ -54,7 +54,9 @@ def resolve_admission(declared: str, scores: Dict[str, Any]) -> str:
     """
     g0 = scores.get("2")
     if not isinstance(g0, dict):
-        return declared
+        # 维度 2 缺失（模型返回 PASS 却没给维度 2 判定，实测抓到）
+        # = G0 无判定依据 = 无法核验，按量规整体 NE，绝不采信自述 PASS。
+        return "NE"
     score = g0.get("score")
     if g0.get("ne") or score is None:
         return "NE"
@@ -289,10 +291,13 @@ class Orchestrator:
                 names = [h.name for h in self.retriever.search(text[:4000], top_k=8)]
             except Exception as e:  # 检索失败不应中断评测，但必须留痕
                 self.warnings.append(f"概念检索失败，知识库上下文降级：{type(e).__name__}")
-        # Tier 2 断言优先：G0 判定的关键证据，不能被 Tier 1 概念条挤占
+        # Tier 2 断言优先：G0 判定的关键证据，不能被 Tier 1 概念条挤占。
+        # top_k 须覆盖单课题断言全集（~15 条）：截断到 8 会按条目序号系统性
+        # 漏掉后半段断言（实测 as-03-014/015 等式性质被挡在上下文之外，
+        # G0 本可核验却判 NE）。单课题断言 × 提示词成本 ≈ 1.7k token，可承受。
         entries: List[KBEntry] = []
         if names:
-            entries.extend(self.kb.retrieve_assertions(names, top_k=8))
+            entries.extend(self.kb.retrieve_assertions(names, top_k=24))
         general = self.kb.retrieve_for_text(text[:4000], top_k=5,
                                             concept_names=names or None)
         seen = {e.id for e in entries}

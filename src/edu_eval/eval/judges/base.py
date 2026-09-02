@@ -22,6 +22,14 @@ class BaseJudge:
                           kb_context: str = "", rule_evidence: str = "") -> str:
         raise NotImplementedError
 
+    def _output_valid(self, data: Dict[str, Any]) -> bool:
+        """输出有效性钩子：子类按角色校验必需字段，默认视为有效。
+
+        无效输出与解析失败同等对待：自动重试一次，且绝不写缓存
+        （否则坏结果会被同键复用）。
+        """
+        return True
+
     def run(self, text: str, context: Dict[str, Any],
             kb_context: str = "", rule_evidence: str = "") -> Dict[str, Any]:
         """执行判定（带缓存与 JSON 解析兜底）。
@@ -44,16 +52,18 @@ class BaseJudge:
 
         raw = self.client.judge(self.system, user)
         data = self._parse_json(raw)
-        if data.get("_parse_failed"):
-            # 真实 hy3 实测偶发输出畸形 JSON（scores 为数字等）。
+        if data.get("_parse_failed") or not self._output_valid(data):
+            # 真实 hy3 实测偶发两类坏输出：畸形 JSON（scores 为数字等）、
+            # 以及「自报 PASS 却缺关键判定字段」（FactJudge 缺维度 2）。
             # 自动重试一次：单次调用失败不该拖垮整份报告。
             raw = self.client.judge(self.system, user)
             data = self._parse_json(raw)
         data["_meta"] = {"role": self.role, "prompt_version": PROMPT_VERSION}
 
-        # 解析失败的结果绝不写缓存：否则坏结果会被同键复用（实测踩坑：
-        # 旧缓存把空解析结果当成有效判定反复命中）
-        if self.cache and key and not data.get("_parse_failed"):
+        # 解析失败/无效输出的结果绝不写缓存：否则坏结果会被同键复用
+        # （实测踩坑：旧缓存把空解析结果当成有效判定反复命中）
+        if (self.cache and key and not data.get("_parse_failed")
+                and self._output_valid(data)):
             self.cache.put(key, data)
         return data
 
