@@ -42,7 +42,8 @@ class FactJudge(BaseJudge):
             f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
             f"【需要评分的维度与量规】\n" + "\n\n".join(lines)
             + rule_block + kb_block +
-            "\n\n请返回严格 JSON：\n"
+            "\n\n请返回严格 JSON（注意：scores 的键必须是上方列出的维度 id 本身"
+            "（如 \"2\"、\"3\"），禁止使用 G0/P1 等优先级标签作为键）：\n"
             "{\"admission\":\"PASS|FAIL|NE\",\"redline\":bool,"
             "\"scores\":{\"<维度id>\":{\"score\":1-5,\"evidence\":\"原文片段\",\"ne\":bool}},"
             "\"suggestions\":[\"改进建议\"]}"

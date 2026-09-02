@@ -30,7 +30,9 @@ class ExpressionSafetyJudge(BaseJudge):
         return (
             f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
             f"【需要评分的维度与量规】\n" + "\n\n".join(lines) +
-            "\n\n请返回严格 JSON：\n"
+            "\n\n请返回严格 JSON（注意：scores 的键必须是上方列出的维度 id 本身"
+            "（如 \"5\"、\"6\"、\"A\"），禁止使用 \"维度 5\" 等前缀形式"
+            "或 G0/P0 等优先级标签）：\n"
             "{\"redline\":bool,"
             "\"scores\":{\"<维度id>\":{\"score\":1-5,\"evidence\":\"原文片段\",\"ne\":bool}},"
             "\"suggestions\":[\"改进建议\"]}"

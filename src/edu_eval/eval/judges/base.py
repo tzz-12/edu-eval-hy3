@@ -44,15 +44,27 @@ class BaseJudge:
 
         raw = self.client.judge(self.system, user)
         data = self._parse_json(raw)
+        if data.get("_parse_failed"):
+            # 真实 hy3 实测偶发输出畸形 JSON（scores 为数字等）。
+            # 自动重试一次：单次调用失败不该拖垮整份报告。
+            raw = self.client.judge(self.system, user)
+            data = self._parse_json(raw)
         data["_meta"] = {"role": self.role, "prompt_version": PROMPT_VERSION}
 
-        if self.cache and key:
+        # 解析失败的结果绝不写缓存：否则坏结果会被同键复用（实测踩坑：
+        # 旧缓存把空解析结果当成有效判定反复命中）
+        if self.cache and key and not data.get("_parse_failed"):
             self.cache.put(key, data)
         return data
 
     @staticmethod
     def _parse_json(raw: str) -> Dict[str, Any]:
-        """严格解析 → 花括号抽取兜底 → 空结果。"""
+        """严格解析 → 花括号抽取兜底 → 诚实失败。
+
+        解析失败时绝不能返回空 dict：normalize 会把空 dict 兜底成
+        admission=PASS / scores={}，即「模型没评上分却被当成通过」。
+        这里显式返回 NE + _parse_failed 标记，由编排层留痕告警。
+        """
         try:
             data = json.loads(raw)
             if isinstance(data, dict):
@@ -67,11 +79,37 @@ class BaseJudge:
                     return data
             except json.JSONDecodeError:
                 pass
-        return {}
+        return {
+            "admission": "NE", "redline": False, "scores": {},
+            "suggestions": [], "_parse_failed": True,
+            "_raw_excerpt": raw[:300],
+        }
 
     @staticmethod
     def normalize(data: Dict[str, Any]) -> Dict[str, Any]:
-        """补齐缺省字段。"""
+        """补齐缺省字段 + scores 键归一化。
+
+        真实 hy3 实测发现：模型偶发把 scores 键写成 \"维度 1\"、\"G0\" 等
+        形式而非维度 id（\"1\"、\"2\"），导致聚合时全部按未知维度丢弃、
+        weight_coverage 骤降。提示词已强化约束，此处再做程序级修正兜底。
+        """
+        from edu_eval.eval import dimensions as _D
+
+        valid_ids = {d.id for d in _D.DIMENSIONS}
+        scores = data.get("scores")
+        if scores is not None and not isinstance(scores, dict):
+            # 实测 hy3 偶发把 scores 返回成数字/字符串等非 dict 形态，
+            # 直接进编排层会在 scores.update() 处崩溃 → 归为解析失败并留痕
+            data["_parse_failed"] = True
+            data.setdefault("_raw_excerpt", f"scores 字段非 dict：{scores!r}"[:200])
+            scores = {}
+        else:
+            scores = scores or {}
+        fixed: Dict[str, Any] = {}
+        for k, v in scores.items():
+            kk = str(k).replace("维度", "").strip()
+            fixed[kk if kk in valid_ids else k] = v
+        data["scores"] = fixed
         data.setdefault("scores", {})
         data.setdefault("suggestions", [])
         data.setdefault("admission", "PASS")

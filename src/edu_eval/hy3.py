@@ -33,17 +33,37 @@ class Hy3Client:
     def judge(self, system: str, user: str, *, temperature=None, max_tokens=None) -> str:
         if self._client is None:
             return _mock_response(system, user)
-        resp = self._client.chat.completions.create(
-            model=self.cfg.model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PREAMBLE + "\n" + system},
-                {"role": "user", "content": user},
-            ],
-            temperature=self.cfg.temperature if temperature is None else temperature,
-            max_tokens=self.cfg.max_tokens if max_tokens is None else max_tokens,
-            response_format={"type": "json_object"},
-        )
-        return resp.choices[0].message.content or ""
+        budget = max_tokens if max_tokens is not None else self.cfg.max_tokens
+
+        def _call(tok: int):
+            return self._client.chat.completions.create(
+                model=self.cfg.model,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PREAMBLE + "\n" + system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=self.cfg.temperature if temperature is None else temperature,
+                max_tokens=tok,
+                response_format={"type": "json_object"},
+            )
+
+        resp = _call(budget)
+        choice = resp.choices[0]
+        content = choice.message.content or ""
+        # hy3 为推理模型：思维链计入 max_tokens 预算。预算被吃满时
+        # finish_reason=length 且 content 为空 → 用翻倍预算重试一次。
+        if not content.strip() and choice.finish_reason == "length":
+            retry_budget = min(budget * 2, 65536)
+            resp = _call(retry_budget)
+            choice = resp.choices[0]
+            content = choice.message.content or ""
+        if not content.strip():
+            # 显式失败而非静默返回空串（空串会被下游解析兜底吞成假 PASS）
+            raise RuntimeError(
+                f"Hy3 返回空内容（finish_reason={choice.finish_reason}，"
+                f"max_tokens={resp.usage.completion_tokens if resp.usage else '?'}）。"
+                "多为推理模型思维链耗尽输出预算，请调大 HY3_MAX_TOKENS 后重试。")
+        return content
 
     def judge_json(self, system: str, user: str, *, temperature=None, max_tokens=None) -> Any:
         return json.loads(self.judge(system, user, temperature=temperature, max_tokens=max_tokens))

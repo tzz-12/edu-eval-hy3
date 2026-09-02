@@ -11,7 +11,10 @@ class Hy3Config:
     api_key: str
     model: str
     temperature: float = 0.0
-    max_tokens: int = 2048
+    # hy3 为推理模型：思维链（reasoning_tokens）计入输出预算，
+    # 2048 会被思维链吃满导致 content 为空（finish_reason=length），
+    # 故默认提高至 8192，可用环境变量 HY3_MAX_TOKENS 覆盖。
+    max_tokens: int = 8192
     timeout: float = 90.0
     # mock 模式：无密钥时返回确定性占位结果，便于本地试用与自动化测试
     mock: bool = False
@@ -22,6 +25,8 @@ class Hy3Config:
         api_key = (os.getenv("HY3_API_KEY") or "").strip()
         model = (os.getenv("HY3_MODEL") or "hunyuan-turbo").strip()
         mock = (os.getenv("HY3_MOCK") or "0").strip() in ("1", "true", "True")
+        max_tokens_raw = (os.getenv("HY3_MAX_TOKENS") or "").strip()
+        max_tokens = int(max_tokens_raw) if max_tokens_raw.isdigit() else 8192
 
         if not base_url:
             if not mock:
@@ -39,4 +44,5 @@ class Hy3Config:
                 )
             mock = True
 
-        return cls(base_url=base_url, api_key=api_key, model=model, mock=mock)
+        return cls(base_url=base_url, api_key=api_key, model=model,
+                   max_tokens=max_tokens, mock=mock)

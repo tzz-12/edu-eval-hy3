@@ -129,6 +129,11 @@ class Orchestrator:
         fact = self.j_fact.run(text, context, kb_context=kb_context,
                               rule_evidence=rule_evidence)
         fact = self.j_fact.normalize(fact)
+        if fact.get("_parse_failed"):
+            self.warnings.append(
+                "FactJudge 输出 JSON 解析失败，G0/维度 2/3 判定退化为 NE"
+                f"（原始输出片段：{fact.get('_raw_excerpt', '')[:120]}…）")
+            report["warnings"] = list(self.warnings)
         report["kb_hits"] = kb_hits
         admission = fact.get("admission", "PASS")
         redline = bool(fact.get("redline", False))
@@ -149,6 +154,12 @@ class Orchestrator:
         expr = self.j_expr.run(text, context)
         design = self.j_design.normalize(design)
         expr = self.j_expr.normalize(expr)
+        for _jname, _jrep in (("DesignJudge", design), ("表达与安全 Judge", expr)):
+            if _jrep.get("_parse_failed"):
+                self.warnings.append(
+                    f"{_jname} 输出 JSON 解析失败，相关维度退化为 NE"
+                    f"（原始输出片段：{_jrep.get('_raw_excerpt', '')[:120]}…）")
+                report["warnings"] = list(self.warnings)
         scores.update(design.get("scores", {}))
         scores.update(expr.get("scores", {}))
         suggestions.extend(design.get("suggestions", []))
