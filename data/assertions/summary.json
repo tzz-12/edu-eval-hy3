@@ -19,8 +19,8 @@
     {
       "topic": "一元一次方程",
       "no": 3,
-      "total": 13,
-      "verified": 12,
+      "total": 15,
+      "verified": 14,
       "unverified": 0,
       "quarantined": 1
     },
@@ -43,22 +43,18 @@
     {
       "topic": "整式的乘法与因式分解",
       "no": 6,
-      "total": 0,
-      "verified": 0,
+      "total": 14,
+      "verified": 13,
       "unverified": 0,
-      "quarantined": 0,
-      "entries": [],
-      "error": "生成失败：未解析出任何候选断言"
+      "quarantined": 1
     },
     {
       "topic": "分式",
       "no": 7,
-      "total": 0,
-      "verified": 0,
+      "total": 12,
+      "verified": 11,
       "unverified": 0,
-      "quarantined": 0,
-      "entries": [],
-      "error": "生成失败：未解析出任何候选断言"
+      "quarantined": 1
     },
     {
       "topic": "勾股定理",
@@ -71,32 +67,26 @@
     {
       "topic": "一次函数",
       "no": 9,
-      "total": 0,
-      "verified": 0,
+      "total": 14,
+      "verified": 13,
       "unverified": 0,
-      "quarantined": 0,
-      "entries": [],
-      "error": "生成失败：未解析出任何候选断言"
+      "quarantined": 1
     },
     {
       "topic": "一元二次方程",
       "no": 10,
-      "total": 0,
-      "verified": 0,
+      "total": 15,
+      "verified": 14,
       "unverified": 0,
-      "quarantined": 0,
-      "entries": [],
-      "error": "生成失败：未解析出任何候选断言"
+      "quarantined": 1
     },
     {
       "topic": "二次函数",
       "no": 11,
-      "total": 0,
-      "verified": 0,
+      "total": 21,
+      "verified": 21,
       "unverified": 0,
-      "quarantined": 0,
-      "entries": [],
-      "error": "生成失败：未解析出任何候选断言"
+      "quarantined": 0
     },
     {
       "topic": "相似三角形",
@@ -109,15 +99,37 @@
     {
       "topic": "锐角三角函数",
       "no": 13,
-      "total": 0,
-      "verified": 0,
+      "total": 12,
+      "verified": 12,
       "unverified": 0,
-      "quarantined": 0,
-      "entries": [],
-      "error": "生成失败：未解析出任何候选断言"
+      "quarantined": 0
+    },
+    {
+      "topic": "平行四边形",
+      "no": 14,
+      "total": 20,
+      "verified": 20,
+      "unverified": 0,
+      "quarantined": 0
+    },
+    {
+      "topic": "正方形",
+      "no": 15,
+      "total": 12,
+      "verified": 12,
+      "unverified": 0,
+      "quarantined": 0
+    },
+    {
+      "topic": "平面镶嵌",
+      "no": 16,
+      "total": 10,
+      "verified": 10,
+      "unverified": 0,
+      "quarantined": 0
     }
   ],
-  "total": 87,
-  "verified": 77,
-  "quarantined": 10
+  "total": 219,
+  "verified": 205,
+  "quarantined": 14
 }

@@ -25,6 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--kb", help="知识库 JSONL 路径（可选）")
     p.add_argument("--json", action="store_true", help="以 JSON 形式输出结果")
     p.add_argument("--mock", action="store_true", help="演示模式：不连接 Hy3，返回占位结果")
+    p.add_argument("--denoise", action="store_true",
+                   help="对文本类输入（.md/.txt）额外跑 PDF 抽取降噪；"
+                        "PDF 路径默认降噪，无需此开关")
     p.add_argument("--out", help="将报告写入该路径（.txt 或 .json）")
     return p
 
@@ -48,7 +51,7 @@ def main(argv=None) -> int:
         print(f"文件不存在：{args.path}", file=sys.stderr)
         return 2
 
-    report = evaluate(args.path, cfg, ctx, kb)
+    report = evaluate(args.path, cfg, ctx, kb, denoise=args.denoise)
 
     if args.json:
         out = json.dumps(report.to_dict(), ensure_ascii=False, indent=2)

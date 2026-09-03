@@ -22,6 +22,23 @@ class BaseJudge:
                           kb_context: str = "", rule_evidence: str = "") -> str:
         raise NotImplementedError
 
+    @staticmethod
+    def _competency_block(context: Dict[str, Any], dim_id: str) -> str:
+        """取该维度的「课标核心素养依据」块（编排层注入，无则空串）。
+
+        评规各维度的锚点已写入素养定语，但 Judge 手里若没有课标原文，
+        就只能凭模型记忆猜「这算不算培养抽象能力」——不可核验。
+        这里把 [KB#cmp-xxx] 原文挂到对应维度下，让判定有据可引。
+        """
+        blocks = (context or {}).get("_competency") or {}
+        body = blocks.get(str(dim_id))
+        if not body:
+            return ""
+        return (
+            "\n课标核心素养依据（判定「素养导向」时优先引用这些条目，"
+            "在 evidence 中用 [KB#cmp-xxx] 标注编号）：\n" + body
+        )
+
     def _output_valid(self, data: Dict[str, Any]) -> bool:
         """输出有效性钩子：子类按角色校验必需字段，默认视为有效。
 

@@ -72,7 +72,8 @@ class Orchestrator:
                  grade_map: Optional[GradeMap] = None,
                  retriever: Optional[KBRetriever] = None,
                  use_cache: bool = True,
-                 warnings: Optional[List[str]] = None):
+                 warnings: Optional[List[str]] = None,
+                 competencies: Optional[List[Any]] = None):
         self.cfg = cfg
         self.client = Hy3Client(cfg)
         self.kb = kb or KnowledgeBase([])
@@ -93,6 +94,10 @@ class Orchestrator:
         if not self.kb.entries:
             self.warnings.append(
                 "知识库为空：fact Judge 缺少可引用的条目，G0 判定退化为 NE。")
+
+        #: 课标核心素养条目（维度 1/3/4/5/7/8/9 「素养导向」判定的官方依据）
+        self.competencies = (competencies if competencies is not None
+                             else self._load_competencies())
 
         self.j_fact = FactJudge(self.client, self.cache)
         self.j_design = DesignJudge(self.client, self.cache)
@@ -116,6 +121,14 @@ class Orchestrator:
             "cache_stats": self.cache.stats(),
         }
         text = parsed.text
+
+        # 课标核心素养依据：按维度注入 Judge 提示。
+        # 评规（dimensions.py）已要求各维度考察素养导向，但若提示里不给课标
+        # 原文，Judge 只能凭模型记忆猜 —— 那就退回成了不可核验的印象分，
+        # 违背 SciEval「reference-guided」与本项目「判定必须有据可引」的原则。
+        # 装在 context 里（而非单独参数）是因为 cache_key 已包含 context，
+        # 素养块变化时缓存自动换键，不会串味。
+        context = {**context, "_competency": self._competency_context()}
 
         # 0) 解析不可靠 → NE（不猜测）
         if parsed.parse_status == "ocr_required" or not text.strip():
@@ -303,6 +316,49 @@ class Orchestrator:
         seen = {e.id for e in entries}
         entries.extend(e for e in general if e.id not in seen)
         return len(entries), self.kb.format_for_prompt(entries)
+
+    def _load_competencies(self) -> List[Any]:
+        """装载课标核心素养条目；缺失或失败进 warnings，绝不静默吞掉。
+
+        与 `knowledge.jsonl`（缺失即硬错误）不同，素养条目是**增强资产**：
+        缺了评测照样能跑，Judge 退回凭通用教育原则判断。所以这里只告警
+        不抛错 —— 但必须留痕，否则「评规要求判素养、提示却没给依据」
+        会静默退化成印象分，是最难发现的一类缺陷。
+        """
+        from ..kb import competency as C
+
+        try:
+            entries = C.load_competencies()
+        except (OSError, ValueError, json.JSONDecodeError) as e:
+            self.warnings.append(
+                f"课标核心素养条目装载失败：{e}；维度 1/3/4/5/7/8/9 的素养导向"
+                "判定将缺少课标原文依据。请运行 "
+                "`python -m edu_eval.kb.competency` 重建。")
+            return []
+        if not entries:
+            self.warnings.append("课标核心素养条目为空：素养导向判定缺少依据。")
+        return entries
+
+    def _competency_context(self) -> Dict[str, str]:
+        """按维度构建「课标核心素养依据」块：{维度 id: 渲染文本}。
+
+        召回范围取自条目的 `dims` 字段，排序优先级取自维度的
+        `competency_link`（本维度重点考察的素养）—— 两者缺一不可：
+        只按 dims 召回，维度 9 可能召回到运算能力而非创新意识。
+        """
+        from ..kb import competency as C
+
+        out: Dict[str, str] = {}
+        if not self.competencies:
+            return out
+        for dim in D.DIMENSIONS:
+            hits = C.by_dimension(self.competencies, dim.id)
+            if not hits:
+                continue
+            block = C.format_for_dimension(hits, focus=dim.competency_link)
+            if block:
+                out[dim.id] = block
+        return out
 
 
 def load_kb_assets(retriever_enabled: bool = True, warnings: Optional[List[str]] = None):

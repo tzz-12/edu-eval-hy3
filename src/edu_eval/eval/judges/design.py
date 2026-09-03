@@ -24,11 +24,14 @@ class DesignJudge(BaseJudge):
             lines.append(
                 f"### 维度 {did} {dim.name}（{dim.priority}，权重 {dim.weight}%）：\n"
                 f"{dim.description}\n锚点：\n{dim.anchors}"
+                + self._competency_block(context, did)
             )
         meta = FactJudge._meta(context)
         return (
             f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
             f"【需要评分的维度与量规】\n" + "\n\n".join(lines) +
+            "\n\n素养导向判定提示：原文若只出现“培养核心素养”等口号而无具体内容对应，"
+            "按各维度锚点的强制规则不予加分，并在 evidence 中说明缺什么。"
             "\n\n请返回严格 JSON（注意：scores 的键必须是上方列出的维度 id 本身"
             "（如 \"1\"、\"4\"、\"7\"、\"8\"、\"9\"），禁止使用 \"维度 1\" 等前缀形式"
             "或 G0/P1 等优先级标签）：\n"

@@ -29,18 +29,12 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import sympy
-from sympy.parsing.sympy_parser import (
-    implicit_multiplication_application,
-    parse_expr,
-    standard_transformations,
-)
-
-from ..eval.rules import _CJK_RE, normalize_math, verify_equation
+from ..eval.rules import _CJK_RE, normalize_math, safe_parse, verify_equation
 from .schema import Tier2Entry
 
-_TRANSFORMS = standard_transformations + (implicit_multiplication_application,)
-
-#: 13 课题清单（docs/kb_scope.md §2，勿擅自改动；改了要同步文档）
+#: 课题清单（docs/kb_scope.md §2，勿擅自改动；改了要同步文档）
+#: no=1–13 为初始 13 核心课题；no=14–16 为校准阶段补入——人教社示范课例
+#: 实测落在 13 课题之外会导致 G0 诚实拒评（NE），拿不到分数分布。
 TOPICS: List[Dict[str, Any]] = [
     {"no": 1, "name": "有理数运算", "grade": "七年级上册", "budget": (10, 15)},
     {"no": 2, "name": "整式的加减", "grade": "七年级上册", "budget": (8, 10)},
@@ -55,6 +49,11 @@ TOPICS: List[Dict[str, Any]] = [
     {"no": 11, "name": "二次函数", "grade": "九年级上册", "budget": (12, 15)},
     {"no": 12, "name": "相似三角形", "grade": "九年级下册", "budget": (10, 12)},
     {"no": 13, "name": "锐角三角函数", "grade": "九年级下册", "budget": (8, 12)},
+    # --- 校准补入（docs/calibration_round1.md §NE 归因）---
+    {"no": 14, "name": "平行四边形", "grade": "八年级下册", "budget": (10, 14)},
+    {"no": 15, "name": "正方形", "grade": "八年级下册", "budget": (8, 12)},
+    {"no": 16, "name": "平面镶嵌", "grade": "八年级上册", "budget": (6, 10),
+     "kind": "数学活动"},
 ]
 
 #: 断言校验方式
@@ -73,7 +72,7 @@ def topic_by_no(no: int) -> Dict[str, Any]:
     for t in TOPICS:
         if t["no"] == no:
             return t
-    raise KeyError(f"未知课题编号：{no}（合法范围 1–13）")
+    raise KeyError(f"未知课题编号：{no}（合法范围 1–{len(TOPICS)}）")
 
 
 def topic_by_name(name: str) -> Dict[str, Any]:
@@ -102,8 +101,12 @@ def gen_user_prompt(topic: Dict[str, Any], max_items: Optional[int] = None) -> s
     if max_items:
         lo = min(lo, max_items)
         hi = min(hi, max_items)
+    kind_hint = ""
+    if topic.get("kind"):
+        kind_hint = f"\n课型：{topic['kind']}。断言须围绕该课型的探究对象与结论，"
+        "不要写成新授课的知识讲授条目。\n"
     return (
-        f"课题：{topic['name']}（{topic['grade']}，人教版）\n"
+        f"课题：{topic['name']}（{topic['grade']}，人教版）{kind_hint}\n"
         f"请输出该课题的 {lo}–{hi} 条**核心可核验断言**，覆盖定义、公式与恒等式、"
         "定理与判定条件、典型解法与易错点四类。\n\n"
         "每条断言必须包含以下字段：\n"
@@ -226,9 +229,8 @@ def verify_solve(formula: str, solutions: List[str]) -> Tuple[str, str]:
     if not lhs or not rhs:
         return "unverified", "不是等式形式（如 x**2-4=0）"
     try:
-        expr = parse_expr(lhs, transformations=_TRANSFORMS) - parse_expr(
-            rhs, transformations=_TRANSFORMS)
-        expected = [parse_expr(normalize_math(s), transformations=_TRANSFORMS)
+        expr = safe_parse(lhs) - safe_parse(rhs)
+        expected = [safe_parse(normalize_math(s))
                     for s in solutions if str(s).strip()]
     except Exception as e:
         return "unverified", f"不可解析：{type(e).__name__}"

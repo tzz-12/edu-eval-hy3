@@ -1,8 +1,24 @@
 {
- "total_topic_concepts": 40,
- "missing_count": 9,
- "coverage_pct": 77.5,
- "gaps": [
+  "total_topic_concepts": 40,
+  "missing_count": 8,
+  "coverage_pct": 80.0,
+  "as_of": "2026-09-03",
+  "resolved_via_extensions": [
+    {
+      "concept": "位似",
+      "kb_id": "math_9b_rjb_ext001",
+      "nearest_old": [],
+      "via_source": "pep-math-taxonomy",
+      "std_ref": "pep-math-2022:9下.27.3"
+    }
+  ],
+  "post_backfill_std_ref": {
+    "concept_grade_total": 452,
+    "concept_grade_with_std_ref": 196,
+    "coverage_pct": 43,
+    "source": "Xww-coder/pep-math-taxonomy (169 topic × standards 字段)"
+  },
+  "gaps": [
   {
    "missing_concept": "等式的性质",
    "nearest": [
@@ -107,10 +123,6 @@
      "match_type": "fts"
     }
    ]
-  },
-  {
-   "missing_concept": "位似",
-   "nearest": []
   }
  ]
 }

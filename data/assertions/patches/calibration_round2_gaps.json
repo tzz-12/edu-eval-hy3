@@ -1,0 +1,163 @@
+[
+  {
+    "_why": "round2 校准：二次函数课例的核心定理是图象平移规律，断言集 as-11-001~014 未覆盖 → 维度2 NE。补 7 条平移/顶点/开口类断言。",
+    "topic_no": 11,
+    "assertion": "抛物线 y=ax² 向左平移 h 个单位得到 y=a(x+h)²，向右平移 h 个单位得到 y=a(x-h)²（h>0，a≠0）",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0, h > 0",
+    "common_errors": [
+      "平移方向记反：认为向右平移得到 y=a(x+h)²",
+      "认为 y=a(x-h)² 是向左平移"
+    ],
+    "concepts": ["二次函数", "抛物线的平移"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 11,
+    "assertion": "抛物线 y=ax² 向上平移 k 个单位得到 y=ax²+k，向下平移 k 个单位得到 y=ax²-k（k>0，a≠0）",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0, k > 0",
+    "common_errors": [
+      "把 y=ax²+k 误认为是左右平移",
+      "认为向上平移得到 y=ax²-k"
+    ],
+    "concepts": ["二次函数", "抛物线的平移"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 11,
+    "assertion": "二次函数 y=a(x-h)²+k（a≠0）的图象是一条抛物线，其顶点坐标为 (h, k)",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0",
+    "common_errors": [
+      "顶点坐标写成 (-h, k)",
+      "顶点坐标写成 (h, -k)"
+    ],
+    "concepts": ["二次函数", "顶点"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 11,
+    "assertion": "二次函数 y=a(x-h)²+k（a≠0）的图象的对称轴是直线 x=h",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0",
+    "common_errors": ["对称轴写成 x=-h", "对称轴写成 y=k"],
+    "concepts": ["二次函数", "对称轴"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 11,
+    "assertion": "二次函数 y=ax²+bx+c（a≠0）的图象的对称轴是直线 x=-b/(2a)",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0",
+    "common_errors": [
+      "对称轴写成 x=b/(2a)（漏负号）",
+      "对称轴写成 x=-b/2（漏 a）"
+    ],
+    "concepts": ["二次函数", "对称轴"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 11,
+    "assertion": "二次函数 y=ax²+bx+c 中，当 a>0 时抛物线开口向上、顶点是最低点、函数有最小值；当 a<0 时开口向下、顶点是最高点、函数有最大值",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0",
+    "common_errors": [
+      "a>0 时误认为开口向下",
+      "认为顶点一定是最低点"
+    ],
+    "concepts": ["二次函数", "开口方向"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 11,
+    "assertion": "对二次函数 y=ax²+bx+c（a≠0），|a| 越大抛物线的开口越小（图象越陡）",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "a ≠ 0",
+    "common_errors": ["认为 |a| 越大开口越大"],
+    "concepts": ["二次函数", "开口大小"],
+    "std_ref": ""
+  },
+
+  {
+    "_why": "round2 校准：平行四边形课例前测题考「平行四边形是否具有稳定性」，断言集 as-14-001~014 未覆盖 → 维度2 NE。补 6 条性质类断言。",
+    "topic_no": 14,
+    "assertion": "平行四边形不具有稳定性，其形状容易改变（与三角形的稳定性相对）",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "",
+    "common_errors": ["认为平行四边形具有稳定性"],
+    "concepts": ["平行四边形", "稳定性"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 14,
+    "assertion": "平行四边形的一条对角线把它分成两个全等的三角形",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "",
+    "common_errors": ["认为分成的两个三角形只是面积相等而非全等"],
+    "concepts": ["平行四边形", "全等三角形"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 14,
+    "assertion": "平行四边形的两条对角线把它分成的四个小三角形面积相等，每个面积等于平行四边形面积的四分之一",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "",
+    "common_errors": ["认为分成的四个三角形全等（仅相对的两个全等）"],
+    "concepts": ["平行四边形", "面积"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 14,
+    "assertion": "平行四边形是中心对称图形，两条对角线的交点是它的对称中心",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "",
+    "common_errors": ["认为平行四边形是轴对称图形"],
+    "concepts": ["平行四边形", "中心对称"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 14,
+    "assertion": "夹在两条平行线间的平行线段相等",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "",
+    "common_errors": ["认为夹在平行线间的任意线段都相等"],
+    "concepts": ["平行四边形", "平行线"],
+    "std_ref": ""
+  },
+  {
+    "topic_no": 14,
+    "assertion": "两条平行线之间的距离处处相等",
+    "kind": "structural",
+    "formula": "",
+    "solutions": [],
+    "conditions": "",
+    "common_errors": ["认为平行线间的距离随位置变化"],
+    "concepts": ["平行四边形", "平行线间的距离"],
+    "std_ref": ""
+  }
+]

@@ -33,6 +33,53 @@ from sympy.parsing.sympy_parser import (
 _TRANSFORMS = standard_transformations + (implicit_multiplication_application,)
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
+
+def _build_safe_locals() -> Dict[str, sympy.Symbol]:
+    """把被 sympy 命名空间占用的「变量名」还原成符号。
+
+    `parse_expr("S")` 返回的不是 Symbol('S') 而是 sympy 的单例注册表 `S`
+    （SingletonRegistry）—— 因为 parse_expr 默认在 `from sympy import *`
+    的命名空间里求值。同样被吞掉的还有 `N`(数值函数)、`O`(大O)、`Q`(假设键)、
+    `E`(自然常数)、`I`(虚数单位)、`beta`/`gamma`(特殊函数)。
+
+    这些恰好都是初中数学的高频记号：S=面积、O=圆心、N=次数、β/γ=角。
+    不处理的话 `S = a*h` 会在取 `free_symbols` 时抛 AttributeError 直接崩，
+    `S*2` 则退化成 TypeError 被当成「不可解析」→ 面积类公式全部漏检。
+
+    做法：把这些名字在 local_dict 里显式映射为 Symbol，local_dict 优先级
+    高于 parse_expr 的内部 global_dict，且不影响 sin/sqrt/pi 等函数。
+    """
+    ns: Dict[str, object] = {}
+    exec("from sympy import *", ns)          # noqa: S102 - 仅用于取符号表
+    greek = {
+        "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
+        "iota", "kappa", "mu", "nu", "xi", "omicron", "rho", "sigma", "tau",
+        "upsilon", "phi", "chi", "psi", "omega",
+    }
+    names = [k for k in ns
+             if k.isidentifier()
+             and ((len(k) == 1 and k.isupper()) or k in greek)]
+    return {k: sympy.Symbol(k) for k in names}
+
+
+#: 解析时注入的符号覆盖表（面积 S / 圆心 O / 角 β 等）
+SAFE_LOCALS: Dict[str, sympy.Symbol] = _build_safe_locals()
+
+
+def safe_parse(expr: str) -> sympy.Expr:
+    """解析数学表达式，屏蔽 sympy 命名空间对常用变量名的占用。
+
+    与 `parse_expr` 的差别：
+    - 注入 SAFE_LOCALS，`S`/`O`/`N`/`beta` 等被解析为符号而非 sympy 内建对象；
+    - 解析结果不是 `sympy.Expr`（如函数类、注册表）时抛 TypeError，
+      让调用方统一走 NE 分支，而不是在后续取属性时炸掉。
+    """
+    out = parse_expr(expr, transformations=_TRANSFORMS,
+                     local_dict=dict(SAFE_LOCALS))
+    if not isinstance(out, sympy.Expr):
+        raise TypeError(f"解析结果非数学表达式：{type(out).__name__}")
+    return out
+
 # ---------------------------------------------------------------- 符号化预处理
 
 _SUPER = {"²": "**2", "³": "**3", "⁴": "**4", "½": "(1/2)"}
@@ -97,8 +144,8 @@ def verify_equation(raw: str) -> EquationCheck:
     if not lhs or not rhs:
         return EquationCheck(raw, "ne", "等式两侧不完整")
     try:
-        le = parse_expr(lhs, transformations=_TRANSFORMS)
-        re_ = parse_expr(rhs, transformations=_TRANSFORMS)
+        le = safe_parse(lhs)
+        re_ = safe_parse(rhs)
     except Exception as e:  # sympy 无法解析 → 交由 LLM
         return EquationCheck(raw, "ne", f"不可解析: {type(e).__name__}")
 

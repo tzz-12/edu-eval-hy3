@@ -1,0 +1,26 @@
+{
+  "二次函数图象性质": {
+    "r1_total": 76.0,
+    "r2_total": null,
+    "r1_admission": "PASS",
+    "r2_admission": "NE"
+  },
+  "平行四边形性质": {
+    "r1_total": null,
+    "r2_total": null,
+    "r1_admission": "NE",
+    "r2_admission": "NE"
+  },
+  "丰富多彩的正方形": {
+    "r1_total": null,
+    "r2_total": 86.0,
+    "r1_admission": "NE",
+    "r2_admission": "PASS"
+  },
+  "平面镶嵌": {
+    "r1_total": null,
+    "r2_total": 78.0,
+    "r1_admission": "NE",
+    "r2_admission": "PASS"
+  }
+}

@@ -33,10 +33,35 @@ sources:
       - 维度认知层次依据（了解/理解/掌握/运用）
       - 内容要求/学业要求/教学提示（Tier 2 断言的 std_ref）
       - 维度 7 学情分析与维度 9 启发式的课标依据
+      - 核心素养与学段目标（见下方 curriculum-2022-competency 子条目）
     constraints:
       - OCR 文本中公式存在失真（如 (a+b)(a-b)=a²-b² 被识别为「（a+B）（a一B）=Q' B」）
       - 公式一律不取自 OCR；仅使用其语义内容
       - 引用时注明「义务教育数学课程标准（2022年版）」及页码
+
+  - id: curriculum-2022-competency
+    name: 义务教育数学课程标准（2022 年版）· 核心素养与学段目标
+    url: http://www.moe.gov.cn/srcsite/A26/s8001/202204/t20220420_621919.html
+    license: 政府公开文件（引用不构成版权问题，注明出处）
+    version: "2022 年版（教育部制定，北京师范大学出版社）"
+    retrieved_at: "2026-09-03"
+    derived_from: curriculum-2022
+    local_path: data/curriculum/curriculum_competency.md   # 人工整理稿，**入库**便于审计
+    derived: data/kb/curriculum_competency.jsonl           # 脚本构建产物（gitignore）
+    scope:
+      - 维度 1「教学目标是否体现核心素养导向」的判定依据（三会 + 初中 9 项主要表现）
+      - 维度 3 学段适配（第四学段学段目标）
+      - 维度 7 学情分析、维度 8 教—学—评一致性（学业质量标准与第四学段学业质量描述）
+      - 维度 9 启发探究（三会内涵中的发现/提出问题与思维过程表述）
+    build: PYTHONPATH=src python -m edu_eval.kb.competency
+    entries: 21
+    constraints:
+      - 政府公开文件的**原文引用**，逐字录入并逐条附 locator（章节定位）
+      - category/aspect/competency/item_no 为本项目编目标签，课标原文无此小标题
+      - derived=true 的 9 条为课标原文片段的拼接/归纳，非单一自然段原文
+      - ocr_corrected=true 的 1 条取自本地 OCR 并已订正错字（主题内载体→主题为载体）
+      - 公式一律不录入；仅保留语义内容
+      - 尚未接入编排层（评规层定稿后再接线），当前仅供装载/检索 API 使用
 
   - id: jpk-indicators
     name: 教育部「基础教育精品课」评审指标体系
@@ -62,3 +87,20 @@ sources:
     constraints:
       - 仅 verified 条目参与 G0 判定
       - 生成时 temperature=0，且逐条留存 prompt 版本与校验记录
+
+  - id: pep-math-taxonomy
+    name: 人教版初中数学知识图谱（Xww-coder/pep-math-taxonomy）
+    url: https://github.com/Xww-coder/pep-math-taxonomy
+    license: CC BY-SA 4.0（内容）+ ODbL 1.0（数据库结构）
+    version: "snapshot-2022-entities+2026-09-ext"
+    retrieved_at: "2026-09-03"
+    local_path: /tmp/pep-math-taxonomy   # 仅参考, 不入仓库
+    scope:
+      - Tier1 std_ref 字段回填（依据 169 topic.standards 引用, 命中 195 条 → 覆盖率 0% → 43%）
+      - 1 条延伸 Tier1 概念「位似变换」(math_9b_rjb_ext001, K12-KGraph 未覆盖)
+    build: PYTHONPATH=src python -m edu_eval.kb.backfill_std_ref
+    entries_added: 196
+    constraints:
+      - ShareAlike 衍生：基于此数据新增的 Tier1 条目保留 CC BY-SA 4.0（见 extensions.jsonl）
+      - 仅引用 topic.id/standards, 不复制 topic.description/evidence/assessmentPrompt 原文
+      - 原 JSON 不重新分发（gitignore 原始数据路径）

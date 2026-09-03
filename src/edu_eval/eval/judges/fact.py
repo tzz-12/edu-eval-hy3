@@ -26,6 +26,7 @@ class FactJudge(BaseJudge):
             lines.append(
                 f"### 维度 {did} {dim.name}（{dim.priority}，权重 {dim.weight}%）：\n"
                 f"{dim.description}\n锚点：\n{dim.anchors}"
+                + self._competency_block(context, did)
             )
         meta = self._meta(context)
         kb_block = f"\n\n【本地知识库检索结果】\n{kb_context}\n" if kb_context else ""

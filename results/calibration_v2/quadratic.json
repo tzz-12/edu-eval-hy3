@@ -1,0 +1,185 @@
+{
+  "admission": "NE",
+  "redline": false,
+  "scores": {},
+  "suggestions": [],
+  "aggregation": {
+    "verdict": "暂不可评",
+    "total_score": null,
+    "grade": null,
+    "reason": "知识正确性准入为 NE：核心断言无法核验（知识库未覆盖/来源冲突/解析不可靠）。"
+  },
+  "parse": {
+    "parse_status": "ok",
+    "parse_confidence": 0.98,
+    "notes": ""
+  },
+  "arbitration": [],
+  "kb_hits": 17,
+  "rules": {
+    "g0_rule_verdict": "NE",
+    "summary": {
+      "formula_checked": 0,
+      "formula_failed": 0,
+      "grade_failed": 0,
+      "structure_missing": 1
+    },
+    "findings": [
+      {
+        "rule_id": "R-GRADE-EXPL",
+        "verdict": "pass",
+        "evidence": "九年级",
+        "detail": {
+          "analysis": {
+            "declared": "九年级",
+            "allowed": [
+              "九年级上册",
+              "九年级下册"
+            ],
+            "parse_ok": true,
+            "total": 3,
+            "known": 3,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_8b_rjb_cpt46",
+                "name": "函数的图象",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              },
+              {
+                "id": "math_9a_rjb_cpt16",
+                "name": "二次函数",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              },
+              {
+                "id": "math_9a_rjb_cpt7",
+                "name": "配方法",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_9a_rjb_cpt16",
+                "name": "二次函数",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              },
+              {
+                "id": "math_9a_rjb_cpt7",
+                "name": "配方法",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "earlier": [
+              {
+                "id": "math_8b_rjb_cpt46",
+                "name": "函数的图象",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              }
+            ],
+            "beyond": [],
+            "allowed_range": [
+              "九年级上册",
+              "九年级下册"
+            ]
+          },
+          "n_concepts": 3
+        }
+      },
+      {
+        "rule_id": "R-GRADE-ASSOC",
+        "verdict": "pass",
+        "evidence": "九年级",
+        "detail": {
+          "analysis": {
+            "declared": "九年级",
+            "allowed": [
+              "九年级上册",
+              "九年级下册"
+            ],
+            "parse_ok": true,
+            "total": 2,
+            "known": 2,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_8b_rjb_cpt43",
+                "name": "函数",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              },
+              {
+                "id": "math_9a_rjb_cpt19",
+                "name": "顶点",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_9a_rjb_cpt19",
+                "name": "顶点",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "earlier": [
+              {
+                "id": "math_8b_rjb_cpt43",
+                "name": "函数",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              }
+            ],
+            "beyond": [],
+            "allowed_range": [
+              "九年级上册",
+              "九年级下册"
+            ]
+          },
+          "n_concepts": 2
+        }
+      },
+      {
+        "rule_id": "R-STRUCT",
+        "verdict": "warn",
+        "evidence": "未检出「作业设计」章节",
+        "detail": {
+          "missing": "作业设计",
+          "keywords": [
+            "作业布置",
+            "课后作业",
+            "作业设计",
+            "布置作业"
+          ]
+        }
+      }
+    ]
+  },
+  "warnings": []
+}

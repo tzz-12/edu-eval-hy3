@@ -22,6 +22,12 @@ KB_DB = os.path.join(KB_DIR, "knowledge.db")
 GRADE_JSON = os.path.join(KB_DIR, "concept_grade.json")
 CURRICULUM_JSONL = os.path.join(KB_DIR, "curriculum_junior.jsonl")
 
+#: 课标「核心素养与学段目标」条目（curriculum_junior 只覆盖内容要求，
+#: 核心素养章不在其中，故单独建一份）。
+#: 人工整理稿入库（可审计），产出的 jsonl 在 data/kb/ 下、随脚本重建。
+COMPETENCY_MD = os.path.join("data", "curriculum", "curriculum_competency.md")
+COMPETENCY_JSONL = os.path.join(KB_DIR, "curriculum_competency.jsonl")
+
 #: Tier 2 可核验断言集目录（P1-1）。
 #: 与 data/kb/ 分开存放是刻意的：data/kb/ 装的是 K12-KGraph 衍生物
 #: （CC BY-NC-SA，不入库），而 Tier 2 断言为本项目自建（MIT），
@@ -87,6 +93,21 @@ def kb_db() -> str:
 
 def grade_json() -> str:
     return resolve(GRADE_JSON)
+
+
+def curriculum_jsonl() -> str:
+    """课标内容要求（160 条，Tier 2 断言的 std_ref 依据）。"""
+    return resolve(CURRICULUM_JSONL)
+
+
+def competency_md() -> str:
+    """核心素养整理稿（入库，人工可审计）。"""
+    return resolve(COMPETENCY_MD)
+
+
+def competency_jsonl() -> str:
+    """核心素养条目（由整理稿构建，不入库）。"""
+    return resolve(COMPETENCY_JSONL)
 
 
 def assertions_dir() -> str:

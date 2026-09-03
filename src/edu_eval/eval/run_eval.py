@@ -104,20 +104,23 @@ class Report:
 
 
 def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
-             kb: Optional[KnowledgeBase] = None) -> Report:
+             kb: Optional[KnowledgeBase] = None, denoise: bool = False) -> Report:
     """评估入口。
 
     P0-10 修复：
     - 适配 load_kb_assets 的新签名（返回 4 元组，含告警列表）；
     - kb 参数仅覆盖知识库本体，年级映射与检索器**始终装载**——
       此前传入 kb 时 gm/retriever 被硬置 None，规则层静默失效。
+
+    `denoise`：对文本类输入（.md/.txt）额外跑一遍抽取降噪。PDF 路径
+    默认降噪（parsers.parse_file 内部处理）。详见 parse.layout.denoise_text。
     """
     ctx = ctx or EvalContext()
     kb_loaded, gm, retriever, warns = load_kb_assets()
     if kb is not None:
         kb_loaded = kb
 
-    parsed: ParsedDoc = parse_file(path)
+    parsed: ParsedDoc = parse_file(path, denoise=denoise)
     context = {"grade": ctx.grade, "version": ctx.version,
                "topic": ctx.topic, "period": ctx.period}
 
@@ -143,13 +146,13 @@ def _to_report(result: Dict[str, Any]) -> Report:
 
 
 def evaluate_from_text(text: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
-                       kb: Optional[KnowledgeBase] = None) -> Report:
+                       kb: Optional[KnowledgeBase] = None, denoise: bool = False) -> Report:
     """便于 Web / 测试直接传入文本。"""
     import tempfile, os
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
         f.write(text)
         tmppath = f.name
     try:
-        return evaluate(tmppath, cfg, ctx, kb)
+        return evaluate(tmppath, cfg, ctx, kb, denoise=denoise)
     finally:
         os.unlink(tmppath)

@@ -7,11 +7,13 @@ import json
 import os
 
 import pytest
+import sympy
 
 from edu_eval.eval.rules import (
     RuleEngine,
     extract_equations,
     normalize_math,
+    safe_parse,
     verify_equation,
 )
 from edu_eval.kb.grade_map import GradeMap, normalize_declared_grade
@@ -63,6 +65,45 @@ class TestFormulaVerification:
         # 不可解析的碎片 → NE（保守判定，不猜测）
         assert verify_equation("中文=无法解析").verdict == "ne"
 
+
+class TestSympyNamespaceShadowing:
+    """sympy 命名空间占用常用变量名导致解析失真（面积 S / 圆心 O / 角 β）。
+
+    回归背景：parse_expr("S") 返回的是 sympy 单例注册表而非 Symbol('S')，
+    使 verify_equation("S=a*h") 抛 AttributeError 直接崩溃、("S*2=2*S")
+    退化成 TypeError 被误判为「不可解析」。初中面积/圆心/角记法高频命中。
+    """
+
+    def test_single_letter_builtins_become_symbols(self):
+        for name in ["S", "O", "N", "Q", "E", "I"]:
+            got = safe_parse(name)
+            assert isinstance(got, sympy.Symbol), (name, type(got))
+            assert got.name == name
+        assert safe_parse("beta").name == "beta"   # 角 β
+
+    def test_builtin_functions_not_broken(self):
+        """反向隔离：注入覆盖表不能把 sin/sqrt/pi 这些真内建误伤成符号。"""
+        assert safe_parse("sin(x)") == sympy.sin(sympy.Symbol("x"))
+        assert safe_parse("sqrt(2)") == sympy.sqrt(2)
+        assert safe_parse("pi") == sympy.pi
+
+    def test_shadowed_symbol_equation_no_longer_crashes(self):
+        # 旧行为：AttributeError（free_symbols 不存在于 SingletonRegistry）
+        chk = verify_equation("S=a*h")
+        assert chk.verdict == "ne"          # 两侧符号集不同 → 保守 NE
+        assert chk.reason
+
+    def test_shadowed_symbol_identity_is_verified(self):
+        # 旧行为：TypeError → "不可解析"，恒等式被白白漏检
+        assert verify_equation("S*2=2*S").verdict == "pass"
+        assert verify_equation("N=2*N/2").verdict == "pass"
+
+    def test_shadowed_symbol_error_is_caught(self):
+        """反向用例：带 S 的**错误**等式必须仍被判 fail，不能因为修 bug 而放行。"""
+        chk = verify_equation("S*3=3*S+1")
+        assert chk.verdict == "fail"
+        assert chk.counterexample is not None
+
     def test_normalize(self):
         assert normalize_math("（a＋b）²") == "(a+b)**2"
         assert normalize_math("√(a²)") == "sqrt(a**2)"
@@ -91,7 +132,8 @@ class TestGradeMap:
     def test_full_coverage(self):
         gm = GradeMap.load(GRADE_JSON)
         mapped = sum(1 for v in gm.mapping.values() if v["grades"])
-        assert mapped == len(gm.mapping) == 451  # 100% 可映射
+        # 100% 可映射 (K12-KGraph 451 + 延伸条目 ≥1, P1-3)
+        assert mapped == len(gm.mapping) >= 451
 
 
 # ---------------- M1：规则层集成 ----------------

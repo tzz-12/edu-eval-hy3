@@ -131,25 +131,87 @@ def write_topic(res: Dict[str, Any], out_dir: str) -> str:
     return path
 
 
+def scan_summary(out_dir: str) -> List[Dict[str, Any]]:
+    """扫描已落盘的 tier2_topic_*.jsonl，重算统计摘要（不调用 LLM）。
+
+    状态一律以 `verification.status` 为准：文件顶层的 `quarantined` 字段在
+    make_entry 中恒为 False，真正的准入门槛是 `Tier2Entry.is_verified`
+    （= 非 quarantined 且 status == verified），两者不可混用。
+    """
+    summary: List[Dict[str, Any]] = []
+    for t in A.TOPICS:
+        path = os.path.join(out_dir, f"tier2_topic_{t['no']:02d}.jsonl")
+        stats = {"verified": 0, "unverified": 0, "quarantined": 0}
+        n = 0
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    n += 1
+                    st = (json.loads(line).get("verification") or {}).get(
+                        "status", "unverified")
+                    stats[st] = stats.get(st, 0) + 1
+        else:
+            stats["error"] = "文件缺失"
+        summary.append({"topic": t["name"], "no": t["no"], "total": n,
+                        **stats})
+    return summary
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="构建 Tier 2 可核验断言集")
     g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--topic", type=int, help="课题编号 1–13")
-    g.add_argument("--all", action="store_true", help="全部 13 课题")
+    g.add_argument("--topic", type=int,
+                   help=f"课题编号 1–{len(A.TOPICS)}")
+    g.add_argument("--all", action="store_true",
+                   help=f"全部 {len(A.TOPICS)} 课题")
+    g.add_argument("--list", action="store_true", help="列出课题清单后退出")
+    g.add_argument("--summary-only", action="store_true",
+                   help="不调用 LLM，直接扫描 --out 下已落盘的断言重算摘要")
     p.add_argument("--out", default=os.path.join("data", "assertions"))
     p.add_argument("--no-consensus", action="store_true",
                    help="跳过结构性断言的一致性复核")
     p.add_argument("--summary", default="", help="统计摘要写入路径（JSON）")
     args = p.parse_args(argv)
 
+    if args.list:
+        for t in A.TOPICS:
+            print(f"{t['no']:>3}  {t['name']}（{t['grade']}）"
+                  f"{'／' + t['kind'] if t.get('kind') else ''}")
+        return 0
+
+    if args.summary_only:
+        # 摘要是**派生数据**，只靠 --all 顺带写会漂移：单课题重跑（如补 14–16）
+        # 不会更新它，实测一度出现「文件里有断言、摘要却写着生成失败」。
+        # 扫盘重算不烧 token，随时可跑。
+        summary = scan_summary(args.out)
+        tot_v = sum(s.get("verified", 0) for s in summary)
+        tot_t = sum(s.get("total", 0) for s in summary)
+        tot_q = sum(s.get("quarantined", 0) for s in summary)
+        print(f"扫盘重算：{tot_t} 条断言，verified {tot_v}，quarantined {tot_q}")
+        for s in summary:
+            print(f"  {s['no']:>3} {s['topic']:<16} {s['total']:>3} 条"
+                  f"（verified {s['verified']} / quarantined {s['quarantined']}"
+                  f" / unverified {s['unverified']}）")
+        if args.summary:
+            with open(args.summary, "w", encoding="utf-8") as f:
+                json.dump({"topics": summary, "total": tot_t,
+                           "verified": tot_v, "quarantined": tot_q},
+                          f, ensure_ascii=False, indent=2)
+            print(f"摘要已写入：{args.summary}")
+        return 0
+
     cfg = Hy3Config.from_env()
     client = Hy3Client(cfg)
     topics = A.TOPICS if args.all else [A.topic_by_no(args.topic)]
 
     summary: List[Dict[str, Any]] = []
+    n_all = len(A.TOPICS)
     for topic in topics:
-        print(f"[{topic['no']:02d}/13] {topic['name']}（{topic['grade']}）…",
-              flush=True)
+        print(f"[{topic['no']:02d}/{n_all}] {topic['name']}"
+              f"（{topic['grade']}）…", flush=True)
         res = build_topic(client, topic, use_consensus=not args.no_consensus)
         if res.get("error"):
             print(f"  ✗ {res['error']}", file=sys.stderr)

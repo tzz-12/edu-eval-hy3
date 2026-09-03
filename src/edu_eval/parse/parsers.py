@@ -16,7 +16,11 @@ import re
 from dataclasses import dataclass, field
 from typing import List
 
-from edu_eval.parse.layout import build_outline, extract_formula_marks
+from edu_eval.parse.layout import (
+    build_outline,
+    denoise_text,
+    extract_formula_marks,
+)
 
 
 @dataclass
@@ -37,22 +41,31 @@ class ParsedDoc:
         return self
 
 
-def parse_file(path: str) -> ParsedDoc:
+def parse_file(path: str, denoise: bool = False) -> ParsedDoc:
+    """解析文档。`denoise` 对文本类输入（.md/.txt）额外跑一遍抽取降噪。
+
+    PDF 抽取的噪声（词内断裂、栏位空格）会污染维度 5 与维度 A：实测人教社
+    示范课例在这两维恒被扣到 3 分，证据却全是"教学过 程"这类抽取瑕疵。
+    因此 **PDF 路径默认降噪**；.md/.txt 被视为"已清洗"输入，默认不动，
+    由调用方（CLI `--denoise`）对「PDF 转存而来的文本」显式开启。
+    """
     ext = os.path.splitext(path)[1].lower()
     if ext in (".md", ".txt"):
-        return _parse_text(path)
+        return _parse_text(path, denoise=denoise)
     if ext == ".docx":
         return _parse_docx(path)
     if ext == ".pdf":
-        return _parse_pdf(path)
+        return _parse_pdf(path, denoise=True)
     if ext == ".pptx":
         return _parse_pptx(path)
     raise ValueError(f"不支持的文件格式：{ext}（支持 .md/.txt/.docx/.pdf/.pptx）")
 
 
-def _parse_text(path: str) -> ParsedDoc:
+def _parse_text(path: str, denoise: bool = False) -> ParsedDoc:
     with open(path, encoding="utf-8", errors="replace") as f:
         text = f.read()
+    if denoise:
+        text = denoise_text(text)
     return ParsedDoc(text=text, parse_confidence=0.98).finalize()
 
 
@@ -79,7 +92,7 @@ def _approx_pages(parts: List[str], per_page: int = 25) -> List[str]:
     return pages or [""]
 
 
-def _parse_pdf(path: str) -> ParsedDoc:
+def _parse_pdf(path: str, denoise: bool = True) -> ParsedDoc:
     pages = None
     notes = []
     # 1) PyMuPDF（优先）
@@ -91,8 +104,10 @@ def _parse_pdf(path: str) -> ParsedDoc:
         with pdfmod.open(path) as pdf:
             pages = [pg.get_text("text") or "" for pg in pdf]
         if any(p.strip() for p in pages):
+            raw = "\n".join(pages)
+            text = denoise_text(raw) if denoise else raw
             return ParsedDoc(
-                text="\n".join(pages),
+                text=text,
                 structure=[f"第{i+1}页" for i in range(len(pages))],
                 pages=pages, parse_confidence=0.92,
             ).finalize()
@@ -118,7 +133,8 @@ def _parse_pdf(path: str) -> ParsedDoc:
                 notes=f"PDF 解析失败：{exc}",
             )
 
-    text = "\n".join(pages)
+    raw = "\n".join(pages)
+    text = denoise_text(raw) if denoise else raw
     if not text.strip():
         # 空文本 → 图片型扫描件，明确状态（G0 将返回 NE）
         return ParsedDoc(

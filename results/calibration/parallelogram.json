@@ -1,0 +1,214 @@
+{
+  "admission": "NE",
+  "redline": false,
+  "scores": {
+    "2": {
+      "score": 5,
+      "evidence": "原文定义：'概念：两组对边分别平行的四边形叫做平行四边形.' '性质：1.平行四边形的对边相等；2.平行四边形的对角相等.' 练习1: AD=3cm AB=2cm 周长=2*(3+2)=10cm选A正确；练习2: ∠D=53°则∠B=53°，CE⊥AB故∠BCE=37°选D正确。但本地知识库检索结果未包含平行四边形性质直接条目（仅有全等三角形等前置KB），核心断言未被知识库或计算规则直接覆盖，依据维度2量规标记NE。",
+      "ne": true
+    },
+    "3": {
+      "score": 5,
+      "evidence": "原文：'授课班级 初二17班''课题 18.1.1 平行四边形的性质''本节课是人教版新课标实验教科书八年级下册第十八章的第一课时'匹配声明目标（八年级，人教版，平行四边形性质，1课时）。认知阶梯：环节二'展示有关平行四边形的生活图片'抽象概念对接[KB#cmp-022]抽象能力；环节三'观察、测量、推理'探究性质对接[KB#cmp-024]几何直观；前置知识'全等三角形'引用[KB#as-05-001]等属八年级上册早于声明年级，规则层判定正常引用不判超纲；整体对接第四学段核心素养表现。",
+      "ne": false
+    }
+  },
+  "suggestions": [
+    "建议知识库补充人教版八年级下册平行四边形性质相关断言条目，以便后续精确核验知识正确性。"
+  ],
+  "aggregation": {
+    "verdict": "暂不可评",
+    "total_score": null,
+    "grade": null,
+    "reason": "知识正确性准入为 NE：核心断言无法核验（知识库未覆盖/来源冲突/解析不可靠）。"
+  },
+  "parse": {
+    "parse_status": "ok",
+    "parse_confidence": 0.92,
+    "notes": ""
+  },
+  "arbitration": [],
+  "kb_hits": 17,
+  "rules": {
+    "g0_rule_verdict": "NE",
+    "summary": {
+      "formula_checked": 0,
+      "formula_failed": 0,
+      "grade_failed": 0,
+      "structure_missing": 1
+    },
+    "findings": [
+      {
+        "rule_id": "R-GRADE-EXPL",
+        "verdict": "pass",
+        "evidence": "八年级",
+        "detail": {
+          "analysis": {
+            "declared": "八年级",
+            "allowed": [
+              "八年级上册",
+              "八年级下册"
+            ],
+            "parse_ok": true,
+            "total": 3,
+            "known": 3,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_8a_rjb_cpt1",
+                "name": "三角形的边",
+                "grades": [
+                  "八年级上册"
+                ],
+                "earliest_grade": "八年级上册"
+              },
+              {
+                "id": "math_8a_rjb_cpt24",
+                "name": "全等三角形",
+                "grades": [
+                  "八年级上册"
+                ],
+                "earliest_grade": "八年级上册"
+              },
+              {
+                "id": "math_7a_rjb_cpt57",
+                "name": "几何图形",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_8a_rjb_cpt1",
+                "name": "三角形的边",
+                "grades": [
+                  "八年级上册"
+                ],
+                "earliest_grade": "八年级上册"
+              },
+              {
+                "id": "math_8a_rjb_cpt24",
+                "name": "全等三角形",
+                "grades": [
+                  "八年级上册"
+                ],
+                "earliest_grade": "八年级上册"
+              }
+            ],
+            "earlier": [
+              {
+                "id": "math_7a_rjb_cpt57",
+                "name": "几何图形",
+                "grades": [
+                  "七年级上册"
+                ],
+                "earliest_grade": "七年级上册"
+              }
+            ],
+            "beyond": [],
+            "allowed_range": [
+              "八年级上册",
+              "八年级下册"
+            ]
+          },
+          "n_concepts": 3
+        }
+      },
+      {
+        "rule_id": "R-GRADE-ASSOC",
+        "verdict": "pass",
+        "evidence": "八年级",
+        "detail": {
+          "analysis": {
+            "declared": "八年级",
+            "allowed": [
+              "八年级上册",
+              "八年级下册"
+            ],
+            "parse_ok": true,
+            "total": 3,
+            "known": 3,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_7b_rjb_cpt71",
+                "name": "数据",
+                "grades": [
+                  "七年级下册"
+                ],
+                "earliest_grade": "七年级下册"
+              },
+              {
+                "id": "math_8b_rjb_cpt28",
+                "name": "矩形",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              },
+              {
+                "id": "math_8b_rjb_cpt34",
+                "name": "菱形",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_8b_rjb_cpt28",
+                "name": "矩形",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              },
+              {
+                "id": "math_8b_rjb_cpt34",
+                "name": "菱形",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              }
+            ],
+            "earlier": [
+              {
+                "id": "math_7b_rjb_cpt71",
+                "name": "数据",
+                "grades": [
+                  "七年级下册"
+                ],
+                "earliest_grade": "七年级下册"
+              }
+            ],
+            "beyond": [],
+            "allowed_range": [
+              "八年级上册",
+              "八年级下册"
+            ]
+          },
+          "n_concepts": 3
+        }
+      },
+      {
+        "rule_id": "R-STRUCT",
+        "verdict": "warn",
+        "evidence": "未检出「作业设计」章节",
+        "detail": {
+          "missing": "作业设计",
+          "keywords": [
+            "作业布置",
+            "课后作业",
+            "作业设计",
+            "布置作业"
+          ]
+        }
+      }
+    ]
+  },
+  "warnings": []
+}

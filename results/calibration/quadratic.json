@@ -1,0 +1,275 @@
+{
+  "admission": "PASS",
+  "redline": false,
+  "scores": {
+    "2": {
+      "score": 5,
+      "evidence": "教学内容分析：'本节课的教学内容是二次函数 y=a(x-h)^2+k 的图象和性质'、'是在探究了二次函数 y=ax^2、y=ax^2+k、y=a(x-h)^2 的图象和性质...基础上'；目标(1)掌握该图象和性质；环节三利用数字教材第36页资源总结性质。无核心知识错误，排版断裂不改含义。",
+      "ne": false,
+      "reason": "核心断言一致可复核且无错误，PASS。",
+      "arbitrated": true
+    },
+    "3": {
+      "score": 5,
+      "evidence": "用户声明九年级人教版课题二次函数的图象和性质；原文课题'二次函数的图象和性质（4）'研究y=a(x-h)^2+k，学生特征分析已有y=ax^2等前置基础，教学策略'由特殊到一般'符合认知阶梯并发展几何直观。",
+      "ne": false,
+      "reason": "与声明学段认知高度匹配且支架合理。",
+      "arbitrated": true
+    },
+    "1": {
+      "score": 3,
+      "evidence": "教学目标(1)掌握图象性质(2)理解位置关系(3)通过探究发展几何直观(4)体会思想培养精神；内容分析提及课标列为学习内容但未指条目编号，目标未显式指向2022课标具体素养表现且(4)非数学素养。",
+      "ne": false,
+      "reason": "目标基本可观察但课标追溯与素养指向不完整。",
+      "arbitrated": true
+    },
+    "4": {
+      "score": 5,
+      "evidence": "环节二：合作交流 互动探究 布置探究活动的任务：活动1：请你写出一个具体的二次函数作为研究对象．活动2：请各小组对你们组所写的这个二次函数进行研究，可以利用平板中的资源辅助探究；学生分小组汇报展示...使用手中pad，利用数字教材资源及GGB绘图软件画出函数图象进行验证．环节三：动手操作总结规律 利用数字教材第36页资源，动手操作总结得到二次函数图象和性质，请三位同学配合展示探究过程并完成黑板中的表格，并总结函数图象的平移关系．设计意图：发展几何直观[KB#cmp-024]，培养勇于探究的科学精神；从特殊到一般的思想方法对应推理能力[KB#cmp-026]．任务、支架（数字资源、GGB）、反馈（教师分屏展示、总结、纠错）完整。",
+      "ne": false
+    },
+    "7": {
+      "score": 3,
+      "evidence": "学生特征分析列出已学函数及平移规律基础，困难：选择特殊函数、形与联系、抽象概括、深度学习；但未设计诊断方式或分层任务对接素养差异。",
+      "ne": false,
+      "reason": "识别前置与困难但未转化为分层策略。",
+      "arbitrated": true
+    },
+    "8": {
+      "score": 3,
+      "evidence": "目标1-3对应环节二探究、环节三表格、环节四练习提交反馈；目标4仅环节五归纳无评价证据，评价未覆盖全部素养。",
+      "ne": false,
+      "reason": "核心目标有评但思想素养目标缺闭环。",
+      "arbitrated": true
+    },
+    "9": {
+      "score": 5,
+      "evidence": "环节二活动1：请你写出一个具体的二次函数作为研究对象．活动2：请各小组对你们组所写的这个二次函数进行研究，可以利用平板中的资源辅助探究；学生分小组汇报展示总结学生研究方法．环节三利用数字教材资源动手操作总结规律，请同学展示探究过程完成表格．认知支架：数字教材、GGB软件、坐标纸；反馈：教师分屏展示、总结、纠错点评．任务显式对应几何直观[KB#cmp-024]（作图分析）、推理能力[KB#cmp-026]（从特殊到一般概括性质），学生能提出理由形成结论，教师依练习情况调整指导。",
+      "ne": false
+    },
+    "5": {
+      "score": 3,
+      "evidence": "原文多处公式换行如'2(\\n)\\n y\\n a x\\n h\\n k\\n\\n\\n'但文字'二次函数 y=a(x-h)^2+k 的图象和性质'可理解，无数学语言素养显性提示。",
+      "ne": false,
+      "reason": "整体可读但符号排版瑕疵未碍理解。",
+      "arbitrated": true
+    },
+    "6": {
+      "score": 3,
+      "evidence": "全文无有害歧视，目标(4)'培养勇于探究的科学精神'及使用数字教材体现育人，但未明确隐私保护与包容设计。",
+      "ne": false,
+      "reason": "安全合规但隐私兼顾不足未达5分。",
+      "arbitrated": true
+    },
+    "A": {
+      "score": 3,
+      "evidence": "文档有'1 / 5'至'5 / 5'页序，含基本信息、教学过程标题，板书表格留空，公式抽取乱但基本可读。",
+      "ne": false,
+      "reason": "层级基本清晰存在局部版式瑕疵。",
+      "arbitrated": true
+    }
+  },
+  "suggestions": [
+    "教学设计未呈现具体练习题目与答案，建议补充以便核验知识应用正确性。",
+    "板书设计表格可预填示例性质以明确预期。",
+    "维度1：教学目标应显式引用课标条目编号（如课标内容要求）并逐项指向具体核心素养表现（如几何直观、推理能力），明确行为条件与达成标准。",
+    "维度7：学情分析可增加诊断方式（如课前小测）并设计分层任务，针对几何直观或推理能力差异提供不同支架。",
+    "维度8：为目标（4）体会数学思想补充可评价证据，如学生反思报告或课堂表达评价量规，使所有目标闭环。",
+    "维度4和9：保持现有探究链条，可进一步明确教师依据学生反应动态调整支架的具体策略。",
+    "修复公式排版为连续标准符号如 y=a(x-h)^2+k",
+    "在教学目标或设计意图中显性融入'数学语言'素养并增加易错点提示",
+    "补全板书表格或标注预设填空以提升格式可读性"
+  ],
+  "aggregation": {
+    "verdict": "通过",
+    "total_score": 76.0,
+    "grade": "良好",
+    "used_dimensions": 9,
+    "skipped_ne": [],
+    "covered_weight": 100.0,
+    "weight_coverage": 1.0,
+    "reason": ""
+  },
+  "parse": {
+    "parse_status": "ok",
+    "parse_confidence": 0.92,
+    "notes": ""
+  },
+  "arbitration": [
+    "2",
+    "3",
+    "1",
+    "7",
+    "8",
+    "5",
+    "6",
+    "A"
+  ],
+  "kb_hits": 17,
+  "rules": {
+    "g0_rule_verdict": "NE",
+    "summary": {
+      "formula_checked": 0,
+      "formula_failed": 0,
+      "grade_failed": 0,
+      "structure_missing": 1
+    },
+    "findings": [
+      {
+        "rule_id": "R-GRADE-EXPL",
+        "verdict": "pass",
+        "evidence": "九年级",
+        "detail": {
+          "analysis": {
+            "declared": "九年级",
+            "allowed": [
+              "九年级上册",
+              "九年级下册"
+            ],
+            "parse_ok": true,
+            "total": 3,
+            "known": 3,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_8b_rjb_cpt46",
+                "name": "函数的图象",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              },
+              {
+                "id": "math_9a_rjb_cpt16",
+                "name": "二次函数",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              },
+              {
+                "id": "math_9a_rjb_cpt7",
+                "name": "配方法",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_9a_rjb_cpt16",
+                "name": "二次函数",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              },
+              {
+                "id": "math_9a_rjb_cpt7",
+                "name": "配方法",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "earlier": [
+              {
+                "id": "math_8b_rjb_cpt46",
+                "name": "函数的图象",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              }
+            ],
+            "beyond": [],
+            "allowed_range": [
+              "九年级上册",
+              "九年级下册"
+            ]
+          },
+          "n_concepts": 3
+        }
+      },
+      {
+        "rule_id": "R-GRADE-ASSOC",
+        "verdict": "pass",
+        "evidence": "九年级",
+        "detail": {
+          "analysis": {
+            "declared": "九年级",
+            "allowed": [
+              "九年级上册",
+              "九年级下册"
+            ],
+            "parse_ok": true,
+            "total": 2,
+            "known": 2,
+            "unknown": 0,
+            "within": [
+              {
+                "id": "math_8b_rjb_cpt43",
+                "name": "函数",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              },
+              {
+                "id": "math_9a_rjb_cpt19",
+                "name": "顶点",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "current": [
+              {
+                "id": "math_9a_rjb_cpt19",
+                "name": "顶点",
+                "grades": [
+                  "九年级上册"
+                ],
+                "earliest_grade": "九年级上册"
+              }
+            ],
+            "earlier": [
+              {
+                "id": "math_8b_rjb_cpt43",
+                "name": "函数",
+                "grades": [
+                  "八年级下册"
+                ],
+                "earliest_grade": "八年级下册"
+              }
+            ],
+            "beyond": [],
+            "allowed_range": [
+              "九年级上册",
+              "九年级下册"
+            ]
+          },
+          "n_concepts": 2
+        }
+      },
+      {
+        "rule_id": "R-STRUCT",
+        "verdict": "warn",
+        "evidence": "未检出「作业设计」章节",
+        "detail": {
+          "missing": "作业设计",
+          "keywords": [
+            "作业布置",
+            "课后作业",
+            "作业设计",
+            "布置作业"
+          ]
+        }
+      }
+    ]
+  },
+  "warnings": []
+}

@@ -166,11 +166,67 @@ def _space(text: str) -> str:
     return " ".join(text) if text else ""
 
 
+def _append_extensions(entries: List[Tier1Entry], ext_path: str) -> int:
+    """重建知识库后追加 extensions.jsonl 中的人工延伸条目 (P1-3)。
+
+    约定：extensions.jsonl 中条目走 schema.Tier1Entry, ID 后缀 _extNNN,
+    用于消化不在 K12-KGraph 中但教学评测需要的细粒度概念
+    （如：位似变换 来源 pep-math-taxonomy CC BY-SA 4.0）。
+    """
+    if not os.path.exists(ext_path):
+        return 0
+    ext_ids = {e.id for e in entries}
+    appended = 0
+    with open(ext_path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            d = json.loads(line)
+            if d.get('id') in ext_ids:
+                continue  # 避免与基础集冲突
+            e = Tier1Entry.from_dict(d)
+            errs = e.validate()
+            if errs:
+                print(f"[跳过延伸条目校验失败] {d.get('id')}: {errs}", file=sys.stderr)
+                continue
+            entries.append(e)
+            ext_ids.add(e.id)
+            appended += 1
+    return appended
+
+
+def _restore_std_ref(entries: List[Tier1Entry], jsonl_path: str) -> int:
+    """重建知识库前保留已有 std_ref 字段 (P1-3 · 防止 backfill 被覆盖)。
+
+    来源: src/edu_eval/kb/backfill_std_ref.py
+    """
+    if not os.path.exists(jsonl_path):
+        return 0
+    preserved: Dict[str, str] = {}
+    with open(jsonl_path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            d = json.loads(line)
+            sr = d.get('std_ref')
+            if sr and d.get('id'):
+                preserved[d['id']] = sr
+    restored = 0
+    for e in entries:
+        if e.id in preserved and not e.std_ref:
+            e.std_ref = preserved[e.id]
+            restored += 1
+    return restored
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="导入 K12-KGraph 为 Tier 1 知识库")
     ap.add_argument("--raw", default="data/raw/k12_math.json")
     ap.add_argument("--out-jsonl", default="data/kb/knowledge.jsonl")
     ap.add_argument("--out-db", default="data/kb/knowledge.db")
+    ap.add_argument("--ext", default="data/kb/extensions.jsonl", help="人工延伸条目源")
     args = ap.parse_args()
 
     entries, stats = load_concepts(args.raw)
@@ -181,7 +237,18 @@ def main() -> None:
             print(f"[校验失败] {eid}: {errs}", file=sys.stderr)
         raise SystemExit(f"共 {len(problems)} 条 Tier1 条目未通过校验，中止")
 
+    restored = _restore_std_ref(entries, args.out_jsonl)
+    if restored:
+        print(f"保留 std_ref: {restored} 条 (来源 backfill_std_ref)")
+
     dump_jsonl(entries, args.out_jsonl)
+
+    appended = _append_extensions(entries, args.ext)
+    if appended:
+        print(f"追加延伸条目: {appended} 条 (来源 {args.ext})")
+        dump_jsonl(entries, args.out_jsonl)
+
+    build_fts(entries, args.out_db)
     build_fts(entries, args.out_db)
 
     alias_filled = sum(1 for e in entries if e.aliases)

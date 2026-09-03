@@ -25,6 +25,7 @@ class ExpressionSafetyJudge(BaseJudge):
                 f"### 维度 {did} {dim.name}（{dim.priority}，权重 {dim.weight}%"
                 f"{'，辅助维度不计入总分' if dim.auxiliary else ''}）：\n"
                 f"{dim.description}\n锚点：\n{dim.anchors}"
+                + self._competency_block(context, did)
             )
         meta = FactJudge._meta(context)
         return (
