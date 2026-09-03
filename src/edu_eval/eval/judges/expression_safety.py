@@ -28,8 +28,10 @@ class ExpressionSafetyJudge(BaseJudge):
                 + self._competency_block(context, did)
             )
         meta = FactJudge._meta(context)
+        lens = self._lens_directive(context)
         return (
-            f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
+            f"{meta}\n\n{lens}"
+            f"【待评估教学设计正文】\n{text}\n\n"
             f"【需要评分的维度与量规】\n" + "\n\n".join(lines) +
             "\n\n请返回严格 JSON（注意：scores 的键必须是上方列出的维度 id 本身"
             "（如 \"5\"、\"6\"、\"A\"），禁止使用 \"维度 5\" 等前缀形式"

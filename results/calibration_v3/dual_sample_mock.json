@@ -1,0 +1,483 @@
+{
+  "config": {
+    "lens_a": "strict_rubric",
+    "lens_b": "learner_view",
+    "threshold": 1,
+    "mock": true,
+    "model": "hunyuan-turbo"
+  },
+  "summary": {
+    "n_samples": 4,
+    "dims_total": 40,
+    "threshold": 1,
+    "avg_path": 40,
+    "arbitrated": 0,
+    "disagreement_rate": 0.0,
+    "numeric_paired": 40,
+    "diff_mean": 0.0,
+    "diff_max": 0,
+    "diff_zero": 40,
+    "diff_gt1": 0
+  },
+  "cost": {
+    "api_calls": 24,
+    "cache_hits": 0,
+    "cache_misses": 24,
+    "arbitrations": 0,
+    "base_judge_calls_nominal": 24
+  },
+  "samples": [
+    {
+      "file": "二次函数的图象和性质.md",
+      "judges": {
+        "fact": {
+          "2": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "3": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "design": {
+          "1": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "4": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "7": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "8": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "9": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "expression_safety": {
+          "5": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "6": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "A": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        }
+      },
+      "admission": "PASS",
+      "redline": false,
+      "aggregate": {
+        "verdict": "通过",
+        "total_score": 60.0,
+        "grade": "合格",
+        "used_dimensions": 9,
+        "skipped_ne": [],
+        "covered_weight": 100.0,
+        "weight_coverage": 1.0,
+        "reason": ""
+      }
+    },
+    {
+      "file": "平行四边形性质.md",
+      "judges": {
+        "fact": {
+          "2": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "3": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "design": {
+          "1": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "4": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "7": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "8": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "9": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "expression_safety": {
+          "5": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "6": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "A": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        }
+      },
+      "admission": "PASS",
+      "redline": false,
+      "aggregate": {
+        "verdict": "通过",
+        "total_score": 60.0,
+        "grade": "合格",
+        "used_dimensions": 9,
+        "skipped_ne": [],
+        "covered_weight": 100.0,
+        "weight_coverage": 1.0,
+        "reason": ""
+      }
+    },
+    {
+      "file": "丰富多彩的正方形.md",
+      "judges": {
+        "fact": {
+          "2": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "3": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "design": {
+          "1": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "4": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "7": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "8": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "9": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "expression_safety": {
+          "5": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "6": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "A": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        }
+      },
+      "admission": "PASS",
+      "redline": false,
+      "aggregate": {
+        "verdict": "通过",
+        "total_score": 60.0,
+        "grade": "合格",
+        "used_dimensions": 9,
+        "skipped_ne": [],
+        "covered_weight": 100.0,
+        "weight_coverage": 1.0,
+        "reason": ""
+      }
+    },
+    {
+      "file": "平面镶嵌.md",
+      "judges": {
+        "fact": {
+          "2": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "3": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "design": {
+          "1": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "4": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "7": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "8": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "9": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        },
+        "expression_safety": {
+          "5": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "6": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          },
+          "A": {
+            "score": 3,
+            "ne": false,
+            "evidence": "（演示模式占位，未连接 Hy3）",
+            "resolution": "average",
+            "a": 3,
+            "b": 3,
+            "diff": 0
+          }
+        }
+      },
+      "admission": "PASS",
+      "redline": false,
+      "aggregate": {
+        "verdict": "通过",
+        "total_score": 60.0,
+        "grade": "合格",
+        "used_dimensions": 9,
+        "skipped_ne": [],
+        "covered_weight": 100.0,
+        "weight_coverage": 1.0,
+        "reason": ""
+      }
+    }
+  ]
+}

@@ -27,8 +27,10 @@ class DesignJudge(BaseJudge):
                 + self._competency_block(context, did)
             )
         meta = FactJudge._meta(context)
+        lens = self._lens_directive(context)
         return (
-            f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
+            f"{meta}\n\n{lens}"
+            f"【待评估教学设计正文】\n{text}\n\n"
             f"【需要评分的维度与量规】\n" + "\n\n".join(lines) +
             "\n\n素养导向判定提示：原文若只出现“培养核心素养”等口号而无具体内容对应，"
             "按各维度锚点的强制规则不予加分，并在 evidence 中说明缺什么。"

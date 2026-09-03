@@ -39,8 +39,10 @@ class FactJudge(BaseJudge):
             "并在 evidence 中引用该概念；\n"
             "- 判定为豁免/联想的概念 → 不构成超纲依据，不得据此扣分。\n"
         ) if rule_evidence else ""
+        lens = self._lens_directive(context)
         return (
-            f"{meta}\n\n【待评估教学设计正文】\n{text}\n\n"
+            f"{meta}\n\n{lens}"
+            f"【待评估教学设计正文】\n{text}\n\n"
             f"【需要评分的维度与量规】\n" + "\n\n".join(lines)
             + rule_block + kb_block +
             "\n\n请返回严格 JSON（注意：scores 的键必须是上方列出的维度 id 本身"

@@ -22,6 +22,30 @@ class BaseJudge:
                           kb_context: str = "", rule_evidence: str = "") -> str:
         raise NotImplementedError
 
+    # 双采样视角扰动指令（原型用）：同一 Judge 两次采样用不同审视视角制造真实
+    # 分歧。因指令进入 user_prompt，cache_key 自动换键、两次采样不串味。
+    # 主流程不传 context["_lens"]，故默认返回空串、对现有评测零副作用。
+    _LENS_DIRECTIVES: Dict[str, str] = {
+        "strict_rubric": (
+            "【本次采样审视视角】请严格按上方量规逐条逐项核对，只依据显式原文证据打分，"
+            "不做发散推断，不确定即标记 ne。"
+        ),
+        "learner_view": (
+            "【本次采样审视视角】请切换到「学习者 / 同行教师」的真实课堂视角审视该教学设计："
+            "设想学生实际学习与教师使用场景，重点判断各维度在真实教学中的达成度与体验，"
+            "再回到量规给分。"
+        ),
+    }
+
+    def _lens_directive(self, context: Dict[str, Any]) -> str:
+        lens = (context or {}).get("_lens")
+        if not lens:
+            return ""
+        directive = self._LENS_DIRECTIVES.get(lens)
+        if not directive:
+            return ""
+        return directive + "\n\n"
+
     @staticmethod
     def _competency_block(context: Dict[str, Any], dim_id: str) -> str:
         """取该维度的「课标核心素养依据」块（编排层注入，无则空串）。
