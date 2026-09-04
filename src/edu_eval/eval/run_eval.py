@@ -13,6 +13,7 @@ from ..config import Hy3Config
 from ..parse.parsers import ParsedDoc, parse_file
 from . import dimensions as D
 from .knowledge_base import KnowledgeBase
+from .dual_sample import DEFAULT_THRESHOLD
 from .orchestrator import Orchestrator, load_kb_assets
 
 
@@ -38,6 +39,8 @@ class Report:
     rules: Dict[str, Any] = field(default_factory=dict)
     #: P0-10 · G/A：资产装载与环境告警（替代此前的静默降级）
     warnings: List[str] = field(default_factory=list)
+    #: 双采样自一致统计（默认开启；--no-dual-sample 关闭时为空 dict）
+    dual_sample: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -51,6 +54,7 @@ class Report:
             "kb_hits": self.kb_hits,
             "rules": self.rules,
             "warnings": self.warnings,
+            "dual_sample": self.dual_sample,
         }
 
     def to_text(self) -> str:
@@ -78,6 +82,14 @@ class Report:
             lines.append(f"总评结论：{agg.get('verdict')}（{agg.get('reason','')}）")
         if self.arbitration:
             lines.append(f"需仲裁维度：{', '.join(self.arbitration)}")
+        # 双采样自一致：把「分数有多可信」显式呈现，而不是只给一个静默的数字
+        ds = self.dual_sample or {}
+        if ds.get("dims_total"):
+            lines.append(
+                f"双采样自一致：{ds['dims_total']} 维度，平均 {ds['avg_path']} / "
+                f"层内仲裁 {ds['arbitrated']}（分歧率 {ds['disagreement_rate']:.0%}），"
+                f"两次分差均值 {ds['diff_mean']}、最大 {ds['diff_max']}"
+                f"（满分完全一致 {ds['diff_zero']}/{ds['numeric_paired']}）")
         # P0-10 · B：规则层确定性结论进入文本报告
         rules = self.rules or {}
         if rules:
@@ -104,7 +116,9 @@ class Report:
 
 
 def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
-             kb: Optional[KnowledgeBase] = None, denoise: bool = False) -> Report:
+             kb: Optional[KnowledgeBase] = None, denoise: bool = False,
+             dual_sample: bool = True,
+             dual_threshold: int = DEFAULT_THRESHOLD) -> Report:
     """评估入口。
 
     P0-10 修复：
@@ -125,7 +139,8 @@ def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
                "topic": ctx.topic, "period": ctx.period}
 
     orch = Orchestrator(cfg, kb=kb_loaded, grade_map=gm, retriever=retriever,
-                        warnings=warns)
+                        warnings=warns, dual_sample=dual_sample,
+                        dual_threshold=dual_threshold)
     result = orch.run(parsed, context)
     return _to_report(result)
 
@@ -142,17 +157,21 @@ def _to_report(result: Dict[str, Any]) -> Report:
         kb_hits=result.get("kb_hits", 0),
         rules=result.get("rules") or {},
         warnings=result.get("warnings") or [],
+        dual_sample=result.get("dual_sample") or {},
     )
 
 
 def evaluate_from_text(text: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
-                       kb: Optional[KnowledgeBase] = None, denoise: bool = False) -> Report:
+                       kb: Optional[KnowledgeBase] = None, denoise: bool = False,
+                       dual_sample: bool = True,
+                       dual_threshold: int = DEFAULT_THRESHOLD) -> Report:
     """便于 Web / 测试直接传入文本。"""
     import tempfile, os
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
         f.write(text)
         tmppath = f.name
     try:
-        return evaluate(tmppath, cfg, ctx, kb, denoise=denoise)
+        return evaluate(tmppath, cfg, ctx, kb, denoise=denoise,
+                        dual_sample=dual_sample, dual_threshold=dual_threshold)
     finally:
         os.unlink(tmppath)

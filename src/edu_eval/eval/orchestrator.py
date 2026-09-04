@@ -40,6 +40,8 @@ from edu_eval.eval.judges.expression_safety import ExpressionSafetyJudge
 from edu_eval.eval.judges.review import ReviewJudge
 from edu_eval.eval.judges.arbitrate import ArbitrateJudge
 from edu_eval.eval.knowledge_base import KnowledgeBase
+from edu_eval.eval.dual_sample import (DEFAULT_THRESHOLD, SampleArbitrator,
+                                       dual_sample_judge, new_stats, summarize)
 
 
 def resolve_admission(declared: str, scores: Dict[str, Any]) -> str:
@@ -73,9 +75,17 @@ class Orchestrator:
                  retriever: Optional[KBRetriever] = None,
                  use_cache: bool = True,
                  warnings: Optional[List[str]] = None,
-                 competencies: Optional[List[Any]] = None):
+                 competencies: Optional[List[Any]] = None,
+                 dual_sample: bool = True,
+                 dual_threshold: int = DEFAULT_THRESHOLD):
         self.cfg = cfg
         self.client = Hy3Client(cfg)
+        #: 双采样自一致（层内）：每个 Judge 两次视角采样，|Δ|≤阈值取平均，
+        #: 否则交层内仲裁员。真实跑显示 Judge 输出带真实方差（28/40 完全一致、
+        #: 最大分差 4），单次采样不可复现，故默认开启；可用 --no-dual-sample 关闭。
+        self.dual_sample = dual_sample
+        self.dual_threshold = dual_threshold
+        self.dual_stats = new_stats(dual_threshold)
         self.kb = kb or KnowledgeBase([])
         self.grade_map = grade_map
         self.retriever = retriever
@@ -104,6 +114,8 @@ class Orchestrator:
         self.j_expr = ExpressionSafetyJudge(self.client, self.cache)
         self.j_review = ReviewJudge(self.client, self.cache)
         self.j_arbit = ArbitrateJudge(self.client, self.cache)
+        #: 层内采样仲裁员（区别于跨层 j_arbit）
+        self.j_arb_sample = SampleArbitrator(self.client, self.cache)
 
     # ------------------------------------------------------------------
     def run(self, parsed: ParsedDoc, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -134,7 +146,7 @@ class Orchestrator:
         if parsed.parse_status == "ocr_required" or not text.strip():
             report["aggregation"] = aggregate("NE", False, {})
             report["warnings"] = list(self.warnings)
-            return report
+            return self._stamp_dual(report)
 
         # 1) 规则层（确定性，零 LLM）
         # 注意：不传 concept_ids —— 让规则层自行把概念分为「文本显式出现」
@@ -159,16 +171,16 @@ class Orchestrator:
             report["suggestions"] = suggestions
             report["aggregation"] = aggregate("FAIL", False, {})
             report["warnings"] = list(self.warnings)
-            return report
+            return self._stamp_dual(report)
 
         # 3) 事实 Judge（G0 + 维度 3）
         #    规则层的确定性判定作为硬证据注入，否则维度 3 完全依赖 LLM，
         #    规则层已算出的超纲结论被浪费。
         kb_hits, kb_context = self._kb_context(text)
         rule_evidence = self._format_rule_evidence(rule_rep)
-        fact = self.j_fact.run(text, context, kb_context=kb_context,
-                              rule_evidence=rule_evidence)
-        fact = self.j_fact.normalize(fact)
+        fact, _ = self._run_judge(self.j_fact, text, context,
+                                  kb_context=kb_context,
+                                  rule_evidence=rule_evidence)
         if fact.get("_parse_failed"):
             self.warnings.append(
                 "FactJudge 输出 JSON 解析失败，G0/维度 2/3 判定退化为 NE"
@@ -189,13 +201,11 @@ class Orchestrator:
             report["suggestions"] = suggestions
             report["aggregation"] = aggregate(admission, redline, scores)
             report["warnings"] = list(self.warnings)
-            return report
+            return self._stamp_dual(report)
 
         # 4) 教学设计 Judge + 表达与安全 Judge
-        design = self.j_design.run(text, context)
-        expr = self.j_expr.run(text, context)
-        design = self.j_design.normalize(design)
-        expr = self.j_expr.normalize(expr)
+        design, _ = self._run_judge(self.j_design, text, context)
+        expr, _ = self._run_judge(self.j_expr, text, context)
         for _jname, _jrep in (("DesignJudge", design), ("表达与安全 Judge", expr)):
             if _jrep.get("_parse_failed"):
                 self.warnings.append(
@@ -244,9 +254,27 @@ class Orchestrator:
         report["aggregation"] = aggregate(admission, redline, scores)
         report["cache_stats"] = self.cache.stats()
         report["warnings"] = list(self.warnings)
-        return report
+        return self._stamp_dual(report)
 
     # ------------------------------------------------------------------
+    def _run_judge(self, judge, text: str, context: Dict[str, Any], **kw):
+        """按配置调度单个 Judge：双采样（默认）或单采样。
+
+        两种模式返回结构一致（admission/redline/scores/suggestions），
+        后续复核/仲裁/聚合逻辑无需分支。
+        """
+        if not self.dual_sample:
+            return judge.normalize(judge.run(text, context, **kw)), None
+        return dual_sample_judge(judge, text, context,
+                                 arb=self.j_arb_sample,
+                                 threshold=self.dual_threshold,
+                                 stats=self.dual_stats, **kw)
+
+    def _stamp_dual(self, report: Dict[str, Any]) -> Dict[str, Any]:
+        """把双采样一致性统计写进报告（所有 return 路径统一调用）。"""
+        report["dual_sample"] = summarize(self.dual_stats, n_samples=1)
+        return report
+
     def _match_concepts(self, text: str) -> List[str]:
         """检索命中的概念 id（供维度 3 年级比对）。"""
         if not self.retriever:

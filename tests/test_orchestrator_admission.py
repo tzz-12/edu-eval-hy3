@@ -24,6 +24,9 @@ def _orch() -> Orchestrator:
 
 class _FakeFact:
     """维度 2 首次判 4 分（PASS），触发 line 183 的 resolve_admission → PASS。"""
+    # role 必填：编排层默认走双采样，dual_sample_judge 按 role 取应评维度
+    role = "fact"
+
     def run(self, text, context, kb_context="", rule_evidence=""):
         return {"admission": "PASS", "redline": False,
                 "scores": {"2": {"score": 4, "ne": False, "evidence": "x"},
@@ -34,7 +37,9 @@ class _FakeFact:
 
 
 class _FakeDesign:
-    def run(self, text, context):
+    role = "design"
+
+    def run(self, text, context, kb_context="", rule_evidence=""):
         return {"scores": {d: {"score": 4, "ne": False, "evidence": "x"}
                            for d in ("1", "4", "7", "8", "9")}, "suggestions": []}
     def normalize(self, d):
@@ -42,7 +47,9 @@ class _FakeDesign:
 
 
 class _FakeExpr:
-    def run(self, text, context):
+    role = "expression_safety"
+
+    def run(self, text, context, kb_context="", rule_evidence=""):
         return {"redline": False,
                 "scores": {d: {"score": 4, "ne": False, "evidence": "x"}
                            for d in ("5", "6", "A")}, "suggestions": []}

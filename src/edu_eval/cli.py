@@ -29,6 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="对文本类输入（.md/.txt）额外跑 PDF 抽取降噪；"
                         "PDF 路径默认降噪，无需此开关")
     p.add_argument("--out", help="将报告写入该路径（.txt 或 .json）")
+    p.add_argument("--no-dual-sample", action="store_true",
+                   help="关闭双采样自一致（默认开启：每个 Judge 两次视角采样，"
+                        "分差 ≤ 阈值取平均、否则层内仲裁）。关闭后每个 Judge 只调一次，"
+                        "更快更省，但分数不可复现性不再被度量")
+    p.add_argument("--dual-threshold", type=int, default=None,
+                   help="双采样分差阈值：|Δ| ≤ 该值取平均，超过则层内仲裁（默认 1）")
     return p
 
 
@@ -51,7 +57,14 @@ def main(argv=None) -> int:
         print(f"文件不存在：{args.path}", file=sys.stderr)
         return 2
 
-    report = evaluate(args.path, cfg, ctx, kb, denoise=args.denoise)
+    if args.dual_threshold is not None and args.dual_threshold < 0:
+        print("--dual-threshold 不能为负数", file=sys.stderr)
+        return 2
+
+    report = evaluate(args.path, cfg, ctx, kb, denoise=args.denoise,
+                      dual_sample=not args.no_dual_sample,
+                      **({"dual_threshold": args.dual_threshold}
+                         if args.dual_threshold is not None else {}))
 
     if args.json:
         out = json.dumps(report.to_dict(), ensure_ascii=False, indent=2)
