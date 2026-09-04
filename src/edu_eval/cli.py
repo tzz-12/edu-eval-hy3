@@ -7,6 +7,7 @@ import os
 import sys
 
 from .config import Hy3Config
+from .hy3 import QuotaExceededError
 from .eval import dimensions as D
 from .eval.knowledge_base import KnowledgeBase
 from .eval.run_eval import EvalContext, evaluate
@@ -61,10 +62,17 @@ def main(argv=None) -> int:
         print("--dual-threshold 不能为负数", file=sys.stderr)
         return 2
 
-    report = evaluate(args.path, cfg, ctx, kb, denoise=args.denoise,
-                      dual_sample=not args.no_dual_sample,
-                      **({"dual_threshold": args.dual_threshold}
-                         if args.dual_threshold is not None else {}))
+    try:
+        report = evaluate(args.path, cfg, ctx, kb, denoise=args.denoise,
+                          dual_sample=not args.no_dual_sample,
+                          **({"dual_threshold": args.dual_threshold}
+                             if args.dual_threshold is not None else {}))
+    except QuotaExceededError as e:
+        # 全局额度故障：报告此时毫无意义，明确报错并给出可操作建议
+        print(f"评测中止（额度/限流耗尽，未产出报告）：\n{e}", file=sys.stderr)
+        print("建议：等待额度重置后重跑，或改用不受该限制的模型/密钥。",
+              file=sys.stderr)
+        return 3
 
     if args.json:
         out = json.dumps(report.to_dict(), ensure_ascii=False, indent=2)

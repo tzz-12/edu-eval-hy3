@@ -17,10 +17,28 @@ _SYSTEM_PREAMBLE = (
 )
 
 
+class QuotaExceededError(RuntimeError):
+    """额度耗尽 / 持续限流：全局故障，重试无意义，必须中止整份评测。
+
+    与「单个 Judge 调用失败」有本质区别：后者可重试、重试不成该维度降级 NE，
+    评测的其他部分仍然有效；前者意味着**后续所有调用都会失败**，若继续按
+    「降级 NE」处理，会产出一份所有维度都是 NE、看起来正常实则完全无效的
+    报告——这才是最危险的失败模式（实测事故见下）。
+    """
+
+
+#: 连续 429 达到该次数即判定为额度耗尽（而非瞬时抖动）并熔断。
+#: 取 3 而非 1 是为了容忍真实的瞬时速率限制（per-minute），
+#: 但足以在额度耗尽时尽早止损：实测一次无效全量跑会浪费 128 次调用。
+RATE_LIMIT_ABORT_AFTER = 3
+
+
 class Hy3Client:
     def __init__(self, cfg: Hy3Config):
         self.cfg = cfg
         self._client = None
+        #: 连续 429 计数（成功即清零），用于区分瞬时抖动与额度耗尽
+        self._consecutive_rate_limits = 0
         if not cfg.mock:
             try:
                 from openai import OpenAI
@@ -31,22 +49,47 @@ class Hy3Client:
             self._client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key,
                                   timeout=cfg.timeout)
 
+    def _note_rate_limit(self, exc: BaseException) -> None:
+        """记录 429；连续达到阈值即熔断（抛 QuotaExceededError 中止整份评测）。
+
+        为什么不用「遇到 429 就中止」：真实存在 per-minute 的瞬时速率限制，
+        偶发 1–2 次属于可恢复抖动，直接中止会误伤正常评测。
+        为什么也不能一直降级 NE：额度耗尽时后续**每一次**调用都会失败，
+        继续跑只会产出「全维度 NE、看似正常实则无效」的报告（实测踩过：
+        一次免费层额度耗尽的全量跑浪费 128 次调用并覆盖了有效基线）。
+        """
+        if getattr(exc, "status_code", None) != 429:
+            return
+        self._consecutive_rate_limits += 1
+        if self._consecutive_rate_limits >= RATE_LIMIT_ABORT_AFTER:
+            raise QuotaExceededError(
+                f"连续 {self._consecutive_rate_limits} 次调用返回 429，判定为额度/限流耗尽，"
+                f"已中止评测（继续跑只会产出全 NE 的无效报告）。"
+                f"原始错误：{str(exc)[:200]}"
+            ) from exc
+
     def judge(self, system: str, user: str, *, temperature=None, max_tokens=None) -> str:
         if self._client is None:
             return _mock_response(system, user)
         budget = max_tokens if max_tokens is not None else self.cfg.max_tokens
 
         def _call(tok: int):
-            return self._client.chat.completions.create(
-                model=self.cfg.model,
-                messages=[
-                    {"role": "system", "content": _SYSTEM_PREAMBLE + "\n" + system},
-                    {"role": "user", "content": user},
-                ],
-                temperature=self.cfg.temperature if temperature is None else temperature,
-                max_tokens=tok,
-                response_format={"type": "json_object"},
-            )
+            try:
+                resp = self._client.chat.completions.create(
+                    model=self.cfg.model,
+                    messages=[
+                        {"role": "system", "content": _SYSTEM_PREAMBLE + "\n" + system},
+                        {"role": "user", "content": user},
+                    ],
+                    temperature=self.cfg.temperature if temperature is None else temperature,
+                    max_tokens=tok,
+                    response_format={"type": "json_object"},
+                )
+            except Exception as exc:
+                self._note_rate_limit(exc)  # 达阈值时抛 QuotaExceededError
+                raise
+            self._consecutive_rate_limits = 0  # 成功即清零
+            return resp
 
         def _content(resp):
             """安全取首条 choice 的 content。

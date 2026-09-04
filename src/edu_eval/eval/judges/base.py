@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any, Dict, Optional
 
-from edu_eval.hy3 import Hy3Client
+from edu_eval.hy3 import Hy3Client, QuotaExceededError
 from edu_eval.eval.cache import PROMPT_VERSION, JudgeCache, cache_key
 
 
@@ -191,7 +191,12 @@ class BaseJudge:
         def _attempt() -> tuple[Optional[str], Dict[str, Any]]:
             try:
                 raw = self.client.judge(self.system, user)
-            except Exception as exc:  # 超时/连接错误/限流在此收口，不向上抛
+            except QuotaExceededError:
+                # 额度/限流耗尽是**全局故障**：重试无意义，且后续每次调用都会
+                # 失败。若在此降级 NE，整份报告会变成「所有维度 NE、看似正常
+                # 实则无效」——比直接报错危险得多，故必须向上传播立即中止。
+                raise
+            except Exception as exc:  # 超时/连接错误/偶发限流在此收口，不向上抛
                 return f"{type(exc).__name__}: {str(exc)[:200]}", {"_parse_failed": True}
             return None, self._coerce_scores(self._parse_json(raw))
 
