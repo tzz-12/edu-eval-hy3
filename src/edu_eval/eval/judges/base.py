@@ -77,6 +77,49 @@ class BaseJudge:
             fixed[kk if kk in valid_ids else k] = v
         return fixed
 
+    @staticmethod
+    def _coerce_score(s: Any) -> Any:
+        """把模型偶发写成字符串/浮点数值的分数统一转回 int。
+
+        实测（ultra-550b 双采样真实跑）：模型偶发返回 {"score": "3"}。
+        若不在解析层统一修正，会连锁产生两个后果：
+        ① _schema_valid 只认 int → 判结构非法 → 白重试一次（浪费一次 API）；
+        ② 两次都非法后，run() 因 api_error is None 把字符串 score 原样返回，
+           下游（聚合 / 双采样的 _num）把 "3" 当「缺失」处理，本该走 average
+           的维度错走 arbitrated_ne，直接污染一致性统计（如正方形 fact2 的
+           a="3"/b="5"）。故在进结构校验之前就归一化类型。
+        """
+        if isinstance(s, bool) or s is None:
+            return s
+        if isinstance(s, int):
+            return s
+        if isinstance(s, float):
+            return int(round(s))
+        if isinstance(s, str):
+            t = s.strip()
+            try:
+                return int(t)
+            except ValueError:
+                pass
+            try:
+                return int(round(float(t)))
+            except ValueError:
+                return s  # 非数值（如 "优秀"）保持原样，交由结构校验判非法
+        return s
+
+    @classmethod
+    def _coerce_scores(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """对「多维度」(scores) 与「单维度」(顶层 score，采样仲裁员用) 两形态
+        统一做分数类型归一化。"""
+        scores = data.get("scores")
+        if isinstance(scores, dict):
+            for item in scores.values():
+                if isinstance(item, dict) and "score" in item:
+                    item["score"] = cls._coerce_score(item["score"])
+        if "score" in data:
+            data["score"] = cls._coerce_score(data["score"])
+        return data
+
     def _schema_valid(self, data: Dict[str, Any]) -> bool:
         """多维度输出的**结构**校验：scores 必须是 dict、覆盖本角色全部维度，
         且每个维度要么 ne=True、要么 score 为 1–5 整数。
@@ -137,7 +180,7 @@ class BaseJudge:
                             self.client.cfg.model, self.system, user, context)
             cached = self.cache.get(key)
             if cached is not None:
-                return cached
+                return self._coerce_scores(cached)
         else:
             key = None
 
@@ -150,7 +193,7 @@ class BaseJudge:
                 raw = self.client.judge(self.system, user)
             except Exception as exc:  # 超时/连接错误/限流在此收口，不向上抛
                 return f"{type(exc).__name__}: {str(exc)[:200]}", {"_parse_failed": True}
-            return None, self._parse_json(raw)
+            return None, self._coerce_scores(self._parse_json(raw))
 
         api_error, data = _attempt()
         if api_error or data.get("_parse_failed") or not self._output_valid(data):
@@ -222,6 +265,9 @@ class BaseJudge:
             scores = scores or {}
         # 与 _schema_valid 共用同一套键归一化规则，避免两处规则漂移
         data["scores"] = BaseJudge._normalize_score_keys(scores, valid_ids)
+        # 分数类型兜底：即便 data 不经 run()（如外部构造/回放），也保证下游
+        # 拿到的是 int，避免 "3" 被当成缺失处理
+        BaseJudge._coerce_scores(data)
         data.setdefault("scores", {})
         data.setdefault("suggestions", [])
         data.setdefault("admission", "PASS")

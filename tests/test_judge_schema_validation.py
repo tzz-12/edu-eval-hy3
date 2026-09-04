@@ -132,12 +132,37 @@ def test_missing_dimension_rejected():
     assert j._output_valid(j.run("正文", {})) is False
 
 
-@pytest.mark.parametrize("bad_score", [0, 6, -1, "3", 3.0, None, True])
+@pytest.mark.parametrize("bad_score", [0, 6, -1, "x", None, True, []])
 def test_out_of_range_or_wrong_type_score_rejected(bad_score):
+    """越界 / 非数值 / 布尔等「无意义或不可映射」的分数必须拒绝。
+
+    注：数值字符串（"3"）与整数值浮点（3.0）已移出本用例——它们属于
+    「语义正确但类型不规范」，走 _coerce_score 救活（见下一条），否则
+    会被拒绝却无兜底，最终静默降级成「缺失」（双采样真实跑踩到的事故）。
+    """
     body = {d: {"score": 3, "ne": False, "evidence": "x"} for d in DESIGN_DIMS}
     body["7"] = {"score": bad_score, "ne": False, "evidence": "x"}
     j = _design(_ScriptedClient(json.dumps({"scores": body})))
     assert j._output_valid(j.run("正文", {})) is False
+
+
+@pytest.mark.parametrize("raw_score,expected", [("3", 3), (3.0, 3), ("4.0", 4)])
+def test_numeric_but_wrong_type_score_coerced(raw_score, expected):
+    """反方向护栏：语义正确、仅类型不规范的分数应被救活，不得浪费重试。
+
+    事故（ultra-550b 双采样真实跑）：模型返回 score:"3"，旧口径判 wrong type
+    拒绝 → 重试仍为 "3" → run() 因无 api_error 把字符串原样返回 → 下游
+    （聚合 / 双采样 _num）把 "3" 当缺失，本该 average 的维度错走
+    arbitrated_ne（如正方形 fact2 的 a="3"/b="5"），污染一致性统计。
+    """
+    body = {d: {"score": 3, "ne": False, "evidence": "x"} for d in DESIGN_DIMS}
+    body["7"] = {"score": raw_score, "ne": False, "evidence": "x"}
+    client = _ScriptedClient(json.dumps({"scores": body}))
+    j = _design(client)
+    data = j.run("正文", {})
+    assert j._output_valid(data) is True
+    assert data["scores"]["7"]["score"] == expected
+    assert client.calls == 1, "可救活的类型不应白白多花一次 API 重试"
 
 
 def test_dimension_value_not_dict_rejected():
