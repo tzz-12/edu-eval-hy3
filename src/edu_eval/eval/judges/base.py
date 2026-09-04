@@ -63,13 +63,63 @@ class BaseJudge:
             "在 evidence 中用 [KB#cmp-xxx] 标注编号）：\n" + body
         )
 
+    @staticmethod
+    def _normalize_score_keys(scores: Dict[str, Any],
+                              valid_ids: set) -> Dict[str, Any]:
+        """scores 键归一化（与 normalize 同规则），供「校验」与「归一化」共用。
+
+        模型偶发把键写成「维度 1」「G0」等形式；校验阶段若不做同样的归一化，
+        会把「内容正确但键名不规范」的输出误判成维度缺失而白白重试。
+        """
+        fixed: Dict[str, Any] = {}
+        for k, v in scores.items():
+            kk = str(k).replace("维度", "").strip()
+            fixed[kk if kk in valid_ids else k] = v
+        return fixed
+
+    def _schema_valid(self, data: Dict[str, Any]) -> bool:
+        """多维度输出的**结构**校验：scores 必须是 dict、覆盖本角色全部维度，
+        且每个维度要么 ne=True、要么 score 为 1–5 整数。
+
+        为什么必须有这道校验（实测事故）：hy3 偶发把「多维度评判」退化成
+        「单维度结构」——顶层给出 score/evidence/ne，同时多出一个**非 dict 的
+        scores 字段**（如整数 1）。此前基类 _output_valid 恒返回 True，这类畸形
+        输出被判为有效 → 不重试、且**写进缓存造成污染**；下游 normalize 才发现
+        scores 非 dict 并把它清空，最终表现为「该 Judge 所有维度分数为 null」，
+        被误读成「模型拒答」。校验前置后，畸形输出会走重试，拿不到才判无效。
+        """
+        from edu_eval.eval import dimensions as _D
+
+        required = _D.JUDGE_GROUPS.get(self.role)
+        if not required:
+            # 非多维度角色（如层内采样仲裁员）不套用本校验
+            return True
+        scores = data.get("scores")
+        if not isinstance(scores, dict):
+            return False
+        valid_ids = {d.id for d in _D.DIMENSIONS}
+        fixed = self._normalize_score_keys(scores, valid_ids)
+        for did in required:
+            item = fixed.get(did)
+            if not isinstance(item, dict):
+                return False
+            if item.get("ne"):
+                continue  # ne 是合法判定，不要求 score
+            s = item.get("score")
+            if not (isinstance(s, int) and not isinstance(s, bool) and 1 <= s <= 5):
+                return False
+        return True
+
     def _output_valid(self, data: Dict[str, Any]) -> bool:
-        """输出有效性钩子：子类按角色校验必需字段，默认视为有效。
+        """输出有效性钩子：默认执行结构校验。
+
+        子类可覆写并先调 super()._output_valid(data) 叠加角色专属规则
+        （如 FactJudge 的「自报 PASS 必须有维度 2 判定」）。
 
         无效输出与解析失败同等对待：自动重试一次，且绝不写缓存
         （否则坏结果会被同键复用）。
         """
-        return True
+        return self._schema_valid(data)
 
     def run(self, text: str, context: Dict[str, Any],
             kb_context: str = "", rule_evidence: str = "") -> Dict[str, Any]:
@@ -156,11 +206,8 @@ class BaseJudge:
             scores = {}
         else:
             scores = scores or {}
-        fixed: Dict[str, Any] = {}
-        for k, v in scores.items():
-            kk = str(k).replace("维度", "").strip()
-            fixed[kk if kk in valid_ids else k] = v
-        data["scores"] = fixed
+        # 与 _schema_valid 共用同一套键归一化规则，避免两处规则漂移
+        data["scores"] = BaseJudge._normalize_score_keys(scores, valid_ids)
         data.setdefault("scores", {})
         data.setdefault("suggestions", [])
         data.setdefault("admission", "PASS")

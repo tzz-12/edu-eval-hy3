@@ -62,14 +62,21 @@ class FactJudge(BaseJudge):
         )
 
     def _output_valid(self, data: Dict[str, Any]) -> bool:
-        """G0 角色校验：自报 PASS 却没给维度 2 判定 → 无效（实测偶发）。
+        """G0 角色校验 = 通用结构校验 + G0 专属规则。
 
         admission=PASS 意味着模型声称已核验知识正确性，此时维度 2
         （知识准确，G0 的评分载体）必须给出 score/ne 判定，否则
         准入结论没有任何判定依据，只能整体 NE（见 orchestrator.resolve_admission）。
         重试一次通常能拿到带维度 2 的完整输出。
+
+        叠加 _schema_valid 的必要性：本方法原本直接用
+        `(data.get("scores") or {}).get("2")`，一旦模型把 scores 返回成
+        非 dict（实测为整数 1），`(1).get(...)` 会抛 AttributeError 直接崩掉评测。
+        结构校验前置即可拦住这类畸形输出并触发重试。
         """
         if data.get("_parse_failed"):
+            return False
+        if not self._schema_valid(data):
             return False
         if str(data.get("admission", "")).upper() == "PASS":
             g0 = (data.get("scores") or {}).get("2")
