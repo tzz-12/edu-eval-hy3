@@ -232,11 +232,16 @@ class Orchestrator:
             report["arbitration"] = disputed
 
         # 6) 聚合
-        report["admission"] = "PASS"
+        # 仲裁可能覆写维度 2（G0）：准入须在仲裁后**重新决议**。否则会出现
+        # 「维度 2 被仲裁成 1 分（FAIL）却仍按 PASS 给总分」的自相矛盾——
+        # 实测抓到：FactJudge 首次把维度 2 判 NE → resolve_admission 判 PASS →
+        # 仲裁把维度 2 覆写成 1，但这里若硬编码 PASS，总分照样给出。
+        admission = resolve_admission(admission, scores)
+        report["admission"] = admission
         report["redline"] = redline
         report["scores"] = scores
         report["suggestions"] = suggestions
-        report["aggregation"] = aggregate("PASS", redline, scores)
+        report["aggregation"] = aggregate(admission, redline, scores)
         report["cache_stats"] = self.cache.stats()
         report["warnings"] = list(self.warnings)
         return report
