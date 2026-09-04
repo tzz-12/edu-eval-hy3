@@ -4,7 +4,7 @@
     "lens_b": "learner_view",
     "threshold": 1,
     "mock": true,
-    "model": "hunyuan-turbo"
+    "model": "hy3-mock"
   },
   "summary": {
     "n_samples": 4,
