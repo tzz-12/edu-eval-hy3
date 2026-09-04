@@ -48,9 +48,25 @@ class Hy3Client:
                 response_format={"type": "json_object"},
             )
 
+        def _content(resp):
+            """安全取首条 choice 的 content。
+
+            实测 OpenRouter 免费层偶发返回 choices=None（200 但无候选，多为
+            上游 provider 瞬时过载/限流），旧逻辑直接 resp.choices[0] 抛
+            TypeError，被上游吞成误导性的「JSON 解析失败」。此处显式抛出
+            可重试错误，让 base 层按「API 异常」路径重试，而非按「坏输出」。
+            """
+            choices = getattr(resp, "choices", None)
+            if not choices:
+                raise RuntimeError(
+                    f"{self.cfg.model} 返回空 choices（OpenRouter 上游瞬时过载/限流，"
+                    f"model={resp.model if hasattr(resp, 'model') else '?'}）。"
+                    "请在稍后重试。")
+            msg = getattr(choices[0], "message", None)
+            return getattr(msg, "content", "") or ""
+
         resp = _call(budget)
-        choice = resp.choices[0]
-        content = choice.message.content or ""
+        content = _content(resp)
         # 推理模型（hy3 / nemotron 等）的思维链计入 max_tokens 预算。预算吃满时
         # finish_reason=length，输出被截断——**无论 content 是否为空**。
         #
@@ -59,16 +75,16 @@ class Hy3Client:
         # 非空（2.6 万字符），旧逻辑「仅当 content 为空才重试」因此不触发，
         # 截断内容被当正常结果返回 → 下游 JSON 解析失败 → 静默退化成 NE。
         # 截断即不完整，故只要 finish_reason=length 就用翻倍预算重试。
-        if choice.finish_reason == "length":
+        if resp.choices[0].finish_reason == "length":
             retry_budget = min(budget * 2, 65536)
             if retry_budget > budget:
                 resp = _call(retry_budget)
-                choice = resp.choices[0]
-                content = choice.message.content or ""
+                content = _content(resp)
         if not content.strip():
             # 显式失败而非静默返回空串（空串会被下游解析兜底吞成假 PASS）
+            finish = resp.choices[0].finish_reason if resp.choices else "?"
             raise RuntimeError(
-                f"{self.cfg.model} 返回空内容（finish_reason={choice.finish_reason}，"
+                f"{self.cfg.model} 返回空内容（finish_reason={finish}，"
                 f"max_tokens={resp.usage.completion_tokens if resp.usage else '?'}）。"
                 "可能原因：① 推理模型的思维链耗尽了输出预算，请调大 HY3_MAX_TOKENS；"
                 "② 该模型不支持 response_format=json_object（换用其他模型或改用提示词约束）。")
