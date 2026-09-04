@@ -28,7 +28,8 @@ class Hy3Client:
                 raise RuntimeError("未安装 openai 库，请先 `pip install openai`。") from exc
             if not cfg.base_url or not cfg.api_key:
                 raise RuntimeError("HY3_BASE_URL 与 HY3_API_KEY 均不可为空。")
-            self._client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key)
+            self._client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key,
+                                  timeout=cfg.timeout)
 
     def judge(self, system: str, user: str, *, temperature=None, max_tokens=None) -> str:
         if self._client is None:
@@ -50,19 +51,27 @@ class Hy3Client:
         resp = _call(budget)
         choice = resp.choices[0]
         content = choice.message.content or ""
-        # hy3 为推理模型：思维链计入 max_tokens 预算。预算被吃满时
-        # finish_reason=length 且 content 为空 → 用翻倍预算重试一次。
-        if not content.strip() and choice.finish_reason == "length":
+        # 推理模型（hy3 / nemotron 等）的思维链计入 max_tokens 预算。预算吃满时
+        # finish_reason=length，输出被截断——**无论 content 是否为空**。
+        #
+        # 踩坑记录：nemotron 在长 Judge 提示下把英文思维链直接吐进 content，
+        # 8192 token 用尽时思维链写到一半、JSON 一个字未输出。此时 content
+        # 非空（2.6 万字符），旧逻辑「仅当 content 为空才重试」因此不触发，
+        # 截断内容被当正常结果返回 → 下游 JSON 解析失败 → 静默退化成 NE。
+        # 截断即不完整，故只要 finish_reason=length 就用翻倍预算重试。
+        if choice.finish_reason == "length":
             retry_budget = min(budget * 2, 65536)
-            resp = _call(retry_budget)
-            choice = resp.choices[0]
-            content = choice.message.content or ""
+            if retry_budget > budget:
+                resp = _call(retry_budget)
+                choice = resp.choices[0]
+                content = choice.message.content or ""
         if not content.strip():
             # 显式失败而非静默返回空串（空串会被下游解析兜底吞成假 PASS）
             raise RuntimeError(
-                f"Hy3 返回空内容（finish_reason={choice.finish_reason}，"
+                f"{self.cfg.model} 返回空内容（finish_reason={choice.finish_reason}，"
                 f"max_tokens={resp.usage.completion_tokens if resp.usage else '?'}）。"
-                "多为推理模型思维链耗尽输出预算，请调大 HY3_MAX_TOKENS 后重试。")
+                "可能原因：① 推理模型的思维链耗尽了输出预算，请调大 HY3_MAX_TOKENS；"
+                "② 该模型不支持 response_format=json_object（换用其他模型或改用提示词约束）。")
         return content
 
     def judge_json(self, system: str, user: str, *, temperature=None, max_tokens=None) -> Any:

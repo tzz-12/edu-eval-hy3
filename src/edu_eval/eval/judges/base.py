@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from edu_eval.hy3 import Hy3Client
 from edu_eval.eval.cache import PROMPT_VERSION, JudgeCache, cache_key
@@ -141,14 +141,28 @@ class BaseJudge:
         else:
             key = None
 
-        raw = self.client.judge(self.system, user)
-        data = self._parse_json(raw)
-        if data.get("_parse_failed") or not self._output_valid(data):
-            # 真实 hy3 实测偶发两类坏输出：畸形 JSON（scores 为数字等）、
-            # 以及「自报 PASS 却缺关键判定字段」（FactJudge 缺维度 2）。
+        # 单次调用可能因三类原因失败：① API 异常（超时/网络/限流）；
+        # ② 输出不是合法 JSON；③ JSON 合法但结构畸形（scores 为整数等）。
+        # 三者一律重试一次后再判定，且任一失败都**不允许让整份报告崩溃**——
+        # 此前 API 异常会直接抛出，一个 Judge 超时即整份评测挂掉。
+        def _attempt() -> tuple[Optional[str], Dict[str, Any]]:
+            try:
+                raw = self.client.judge(self.system, user)
+            except Exception as exc:  # 超时/连接错误/限流在此收口，不向上抛
+                return f"{type(exc).__name__}: {str(exc)[:200]}", {"_parse_failed": True}
+            return None, self._parse_json(raw)
+
+        api_error, data = _attempt()
+        if api_error or data.get("_parse_failed") or not self._output_valid(data):
+            # 真实 hy3 实测偶发坏输出：畸形 JSON、或「自报 PASS 却缺关键判定」。
             # 自动重试一次：单次调用失败不该拖垮整份报告。
-            raw = self.client.judge(self.system, user)
-            data = self._parse_json(raw)
+            api_error, data = _attempt()
+
+        if api_error:
+            # 两次都失败（或压根没拿到响应）：诚实 NE 并留痕，供编排层告警。
+            data = {"admission": "NE", "redline": False, "scores": {},
+                    "suggestions": [], "_parse_failed": True,
+                    "_api_error": api_error}
         data["_meta"] = {"role": self.role, "prompt_version": PROMPT_VERSION}
 
         # 解析失败/无效输出的结果绝不写缓存：否则坏结果会被同键复用
