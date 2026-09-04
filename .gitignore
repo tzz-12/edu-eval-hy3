@@ -30,3 +30,11 @@ results/tmp/
 .DS_Store
 .idea/
 .vscode/
+
+# Demo 应用运行时产物（启动脚本产生）
+.demo.pid
+results/demo.db
+results/demo.log
+
+# 预生成的演示报告（mock 模式下无效；用真实 API 重跑 scripts/pregen_demo_reports.py 产出）
+data/demo_reports/

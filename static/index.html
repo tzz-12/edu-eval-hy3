@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduEval Demo · AI 课件质量评测</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js 用于雷达图 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">EE</span>
+      <h1>EduEval</h1>
+      <span class="tagline">AI 生成 K-12 课件质量评测 · 基于混元 Hy3</span>
+    </div>
+    <div class="status" id="healthBadge">
+      <span class="dot dot-grey"></span>
+      <span id="healthText">检查中…</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="evaluate">评测</button>
+    <button class="tab" data-tab="report">报告 <span id="reportTabBadge" class="badge hidden">0</span></button>
+    <button class="tab" data-tab="history">历史</button>
+  </nav>
+
+  <main>
+    <!-- ========== 评测页 ========== -->
+    <section id="tab-evaluate" class="tab-pane active">
+      <div class="card">
+        <h2>📋 课件文本</h2>
+        <p class="hint">粘贴 Markdown 或纯文本，或拖入 .md/.txt/.pdf 文件</p>
+        <textarea id="textInput" placeholder="在此粘贴待评测的课件文本…&#10;&#10;示例：一份二次函数的教学设计，含教学目标、环节、评价任务…"></textarea>
+        <input type="file" id="fileInput" accept=".md,.txt,.pdf" style="margin-top: 8px;">
+      </div>
+
+      <div class="card">
+        <h2>⚙️ 评测配置</h2>
+        <div class="config-grid">
+          <label>
+            <span>声明年级</span>
+            <select id="gradeSelect"><option value="">加载中…</option></select>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="dualSampleCheck" checked>
+            <span>启用双采样自一致</span>
+          </label>
+          <label>
+            <span>分差阈值（&gt; 此值触发层内仲裁）</span>
+            <input type="number" id="dualThresholdInput" value="1" min="0" max="4">
+          </label>
+        </div>
+      </div>
+
+      <div class="card shortcut-card">
+        <h2>🚀 演示快捷入口（秒级）</h2>
+        <p class="hint">用于演示机制故事：好样本 vs 坏样本对照，无需等待真实评测</p>
+        <div id="demoButtons" class="demo-buttons">
+          <span class="loading">加载中…</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="evaluateBtn" class="primary">▶ 开始评测（真实 API）</button>
+        <span id="evaluateStatus" class="status-text"></span>
+      </div>
+
+      <div id="evaluateProgress" class="progress hidden">
+        <div class="spinner"></div>
+        <span id="progressText">正在调 LLM 评测…（同步阻塞 30-90s）</span>
+      </div>
+    </section>
+
+    <!-- ========== 报告页 ========== -->
+    <section id="tab-report" class="tab-pane">
+      <div id="reportEmpty" class="empty">
+        <p>还没有报告。点击「评测」或「演示快捷入口」生成。</p>
+      </div>
+
+      <div id="reportContent" class="hidden">
+        <div class="card summary-card">
+          <div class="summary-grid">
+            <div class="metric">
+              <div class="metric-label">准入</div>
+              <div class="metric-value" id="admissionBadge">-</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">加权总分</div>
+              <div class="metric-value" id="totalScore">-</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">等级</div>
+              <div class="metric-value" id="gradeLevel">-</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">结论</div>
+              <div class="metric-value verdict" id="verdict">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>📊 八维雷达</h3>
+            <canvas id="radarChart" height="300"></canvas>
+            <div id="g0Notice" class="notice hidden"></div>
+          </div>
+          <div class="card">
+            <h3>🔍 双采样自一致</h3>
+            <div id="dualSampleBlock">未启用</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>📋 各维度详情</h3>
+          <div id="dimDetail"></div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>📜 规则层（G0 判定）</h3>
+            <div id="rulesBlock"></div>
+          </div>
+          <div class="card">
+            <h3>⚠️ 环境告警</h3>
+            <div id="warningsBlock">无</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>💡 改进建议</h3>
+          <ul id="suggestionsList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 历史页 ========== -->
+    <section id="tab-history" class="tab-pane">
+      <div class="card">
+        <h2>📚 评测历史</h2>
+        <table id="historyTable">
+          <thead>
+            <tr><th>ID</th><th>时间</th><th>年级</th><th>准入</th><th>总分</th><th>双采样</th><th>内容预览</th><th></th></tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="8" class="loading">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
