@@ -48,7 +48,13 @@ $$(".tab").forEach(b => b.addEventListener("click", () => {
   try {
     const h = await api("GET", "/api/health");
     const ok = h.api_key_configured;
-    $("#healthBadge").innerHTML = `<span class="dot ${ok?"dot-green":"dot-red"}"></span><span>${ok ? "API 已配置" : "API 未配置"}</span>`;
+    let html = `<span class="dot ${ok?"dot-green":"dot-red"}"></span><span>${ok ? "API 已配置" : "API 未配置"}</span>`;
+    if (!h.db_writable) {
+      html += `<span class="dot dot-warn" title="${escHtml(h.db_note || "历史库不可写")}"></span><span>历史库只读</span>`;
+    } else if (h.db_note) {
+      html += `<span class="dot dot-warn" title="${escHtml(h.db_note)}"></span><span>历史库已降级</span>`;
+    }
+    $("#healthBadge").innerHTML = html;
   } catch (e) {
     $("#healthBadge").innerHTML = `<span class="dot dot-red"></span><span>API 异常</span>`;
   }
@@ -77,9 +83,13 @@ $$(".tab").forEach(b => b.addEventListener("click", () => {
 })();
 
 // ============== 文件上传 ==============
+// 记住来源文件名，提交时带给后端，历史列表里显示它而不是正文前 N 字
+let currentFileName = "";
+
 $("#fileInput").addEventListener("change", async (e) => {
   const f = e.target.files[0];
   if (!f) return;
+  currentFileName = f.name;
   if (f.name.endsWith(".pdf")) {
     $("#textInput").value = `(PDF 上传由后端处理：${f.name})\n\n请等待评测时后端读 PDF…`;
   } else {
@@ -104,6 +114,7 @@ $("#evaluateBtn").addEventListener("click", async () => {
     const r = await api("POST", "/api/evaluate", {
       text,
       grade,
+      file_name: currentFileName,
       source: "live",
       dual_sample: $("#dualSampleCheck").checked,
       dual_threshold: parseInt($("#dualThresholdInput").value, 10),
@@ -169,6 +180,8 @@ function renderReport(r) {
     g0Notice.classList.add("hidden");
   }
 
+  // 维度全空时雷达会画成「全 0」，容易被误读成"每题都得 0 分"，补一句解释
+  $("#radarEmptyHint").classList.toggle("hidden", Object.keys(r.scores || {}).length > 0);
   renderRadar(r.scores || {});
   renderDualSample(r.dual_sample || {});
   renderDimDetail(r.scores || {}, r.arbitration || []);

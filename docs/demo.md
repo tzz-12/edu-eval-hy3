@@ -19,14 +19,19 @@ HY3_TIMEOUT=300
 ## 2. 一键启动
 
 ```bash
-bash scripts/run_demo.sh start        # 默认 8000 端口
+bash scripts/run_demo.sh start        # 默认 8000 端口，mock 模式
 bash scripts/run_demo.sh start 8765   # 自定义端口
+bash scripts/run_demo.sh start 8000 --live   # 真实调 API（需 .env 已配 key）
+bash scripts/run_demo.sh pregen       # 重生成演示报告（可加 --live）
 bash scripts/run_demo.sh status
 bash scripts/run_demo.sh tail         # 看日志
 bash scripts/run_demo.sh stop
 ```
 
 启动后浏览器打开 `http://localhost:8000`。
+
+不加 `--live` 时走内置 mock 后端（`HY3_MOCK=1`），不通网、不耗额度，
+用于验证前后端链路贯通；要跑真实评测必须显式加 `--live`。
 
 ## 3. 演示快捷入口（秒级）
 
@@ -50,7 +55,7 @@ python scripts/pregen_demo_reports.py
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/health` | 不暴露 key，仅返回 `{ok, api_key_configured, model, base_url}` |
+| GET | `/api/health` | 不暴露 key，返回 `{ok, api_key_configured, model, base_url, db_writable, db_path, db_note, db_count}` |
 | GET | `/api/grades` | 支持的年级列表 |
 | GET | `/api/demo-samples` | 可用的演示快捷入口（自动扫 `data/demo_reports/`） |
 | POST | `/api/evaluate` | 同步评测（30-90s） |
@@ -63,11 +68,29 @@ python scripts/pregen_demo_reports.py
 {
   "text": "课件文本…",
   "grade": "九年级",
+  "file_name": "选填，上传文件时传原名",
   "source": "live",         // 或 "demo:01_good_二次函数"
   "dual_sample": true,
   "dual_threshold": 1
 }
 ```
+
+- `source` 以 `demo:` 开头时 `text` 可省略，直接读预生成报告，**不写历史库**（避免污染）。
+- `file_name` 留空时，历史列表显示名会取正文首个 `# 一级标题`，再兜底为「粘贴文本」——
+  不会退化成正文前 N 字把表格糊满。
+- `demo:` 后面的 id 含 `/` 或 `..` 一律 400（防路径穿越）。
+
+## 5. 历史库落点与降级
+
+`storage.py` 在 import 时按序探测并选第一个可写的路径：
+
+1. 环境变量 `EDU_EVAL_DEMO_DB`
+2. `./results/demo.db`（仓库内，gitignored）
+3. 系统临时目录 `<tmpdir>/edu_eval_demo/demo.db`
+
+受限环境（如沙箱拦截仓库目录写入）下会自动降级到临时目录，历史功能照常可用；
+`/api/health` 的 `db_path` / `db_note` 会暴露实际落点，前端顶栏也会显示「历史库已降级」。
+所有 DB 操作出错时降级为返回空值，**不会把 500 抛给前端**。
 
 ## 5. 目录结构
 
@@ -75,7 +98,9 @@ python scripts/pregen_demo_reports.py
 src/edu_eval/api/        # FastAPI 应用
   ├── __init__.py
   ├── main.py            # 应用实例 fastapi_app（避开与模块名冲突）
-  ├── storage.py         # SQLite 历史持久化（results/demo.db）
+  ├── storage.py         # SQLite 历史：路径探测降级 + 连接不泄漏 + 错误降级
+  ├── serialize.py       # sympy 等非原生类型的 JSON 清洗（API 与 pregen 共用）
+  ├── dirs.py            # 共享路径常量（演示报告目录）
   ├── models.py          # Pydantic 模型
   └── routes/
       ├── health.py      # /api/health, /api/grades, /api/demo-samples
@@ -102,5 +127,8 @@ results/
 | `/api/health` 返回 `api_key_configured: false` | `.env` 未被 source，或未 export `HY3_API_KEY` |
 | 评测返回 500 + `RateLimitError` | OpenRouter 免费层日额度耗尽，等明早重置，或换模型 |
 | 演示按钮点击 404 | `data/demo_reports/` 下无对应文件，先跑 `pregen_demo_reports.py` |
+| `/api/reports` 500 + `disk I/O error` | 历史库路径不可写；`/api/health` 查 `db_path`/`db_note`，必要时用 `EDU_EVAL_DEMO_DB` 指定可写目录 |
+| 顶栏显示「历史库已降级」 | `results/` 不可写，已自动落到临时目录；评测本身不受影响，只是历史不持久 |
 | 静态文件 404 | 检查仓库根目录 `static/` 是否存在 |
+| 启动报 `ModuleNotFoundError: No module named 'edu_eval'` | PYTHONPATH 未含 `src/`；`run_demo.sh` 已处理，手动启动需 `export PYTHONPATH=$PWD/src` |
 | 端口占用 | `lsof -i:8000` 找占用，杀掉或换端口启动 |

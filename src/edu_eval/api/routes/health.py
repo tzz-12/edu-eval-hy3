@@ -7,7 +7,9 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
+from ..dirs import demo_dir
 from ..models import HealthResponse
+from ..storage import db_status
 
 router = APIRouter()
 
@@ -22,11 +24,16 @@ GRADES = [
 def health() -> HealthResponse:
     """不暴露 key，仅返回是否已配置。"""
     key = os.environ.get("HY3_API_KEY", "").strip()
+    db = db_status()
     return HealthResponse(
         ok=bool(key),
         api_key_configured=bool(key),
         model=os.environ.get("HY3_MODEL", "未配置"),
         base_url=os.environ.get("HY3_BASE_URL", ""),
+        db_writable=db["db_writable"],
+        db_path=db["db_path"],
+        db_note=db["db_note"],
+        db_count=db["db_count"],
     )
 
 
@@ -39,11 +46,11 @@ def grades() -> dict:
 def demo_samples() -> dict:
     """列出可用的演示快捷入口（与 data/demo_reports/ 下的文件名对应）。"""
     import json
-    demo_dir = Path("data/demo_reports")
-    if not demo_dir.exists():
+    d = demo_dir()
+    if not d.exists():
         return {"samples": []}
     samples = []
-    for p in sorted(demo_dir.glob("*.json")):
+    for p in sorted(d.glob("*.json")):
         try:
             r = json.loads(p.read_text(encoding="utf-8"))
             samples.append({

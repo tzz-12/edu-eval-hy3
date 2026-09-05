@@ -18,62 +18,36 @@ from fastapi import APIRouter, HTTPException
 
 from ...config import Hy3Config
 from ...eval.run_eval import EvalContext, evaluate_from_text
+from ..dirs import demo_dir
 from ..models import EvaluateRequest
+from ..serialize import json_default as _json_default, sanitize as _sanitize_payload
 from ..storage import add_report
-import sympy
-
-def _json_default(o):
-    """sympy Integer/Float 等非原生类型 → 原生 Python 值，供 FastAPI 序列化。"""
-    try:
-        if isinstance(o, sympy.Integer):  return int(o)
-        if isinstance(o, sympy.Float):    return float(o)
-        if isinstance(o, sympy.BoolAtom): return bool(o)
-    except ImportError:
-        pass
-    if hasattr(o, "is_integer") and o.is_integer:
-        return int(o)
-    if hasattr(o, "as_real_imag"):
-        return float(o)
-    if isinstance(o, (set, frozenset)):
-        return list(o)
-    return str(o)
-
-
-def _sanitize_payload(obj):
-    """深清洗：递归把 sympy Integer/Float/Bool 等非原生类型转 Python 原生值，
-    供 FastAPI JSONResponse 序列化。jsonable_encoder 本身只认标准类型。"""
-    if obj is None or isinstance(obj, (str, bool, int, float)):
-        return obj
-    if isinstance(obj, dict):
-        return {k: _sanitize_payload(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_sanitize_payload(v) for v in obj]
-    try:
-        import sympy
-        if isinstance(obj, (sympy.Integer, sympy.BoolAtom)):
-            return int(obj) if isinstance(obj, sympy.Integer) else bool(obj)
-        if isinstance(obj, sympy.Float):
-            return float(obj)
-        if isinstance(obj, sympy.Basic):
-            return str(obj)
-    except ImportError:
-        pass
-    # 最后兜底：可调用 str() 的都字符串化
-    try:
-        return str(obj)
-    except Exception:
-        return None
-
 
 router = APIRouter()
 log = logging.getLogger(__name__)
 
-DEMO_DIR = Path(os.environ.get("EDU_EVAL_DEMO_DIR", "data/demo_reports"))
+DEMO_DIR = demo_dir()
 
 
 def _truncate(text: str, n: int = 60) -> str:
     t = text.strip().replace("\n", " ")
     return t[:n] + ("…" if len(t) > n else "")
+
+
+def _derive_name(explicit: str | None, text: str) -> str:
+    """历史列表显示名：显式文件名 > 正文首个一级标题 > 「粘贴文本」。
+
+    不要退化成正文前 N 字——历史表格会被一坨课文糊满。
+    """
+    if explicit and explicit.strip():
+        return _truncate(explicit.strip(), 80)
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line.startswith("#"):
+            title = line.lstrip("#").strip()
+            if title:
+                return _truncate(title, 80)
+    return "粘贴文本"
 
 
 @router.post("/api/evaluate")
@@ -125,7 +99,7 @@ def evaluate(req: EvaluateRequest) -> Dict[str, Any]:
     try:
         rid = add_report(
             payload,
-            file_name=_truncate(req.text),
+            file_name=_derive_name(req.file_name, req.text or ""),
             grade=req.grade,
             dual_sample=req.dual_sample,
         )

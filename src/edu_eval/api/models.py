@@ -16,6 +16,11 @@ class EvaluateRequest(BaseModel):
         None, description="课件文本（Markdown/纯文本）；demo 源下可省略"
     )
     grade: str = Field(..., description="年级，如 七年级/八年级/九年级")
+    file_name: Optional[str] = Field(
+        None,
+        description="来源文件名（上传文件时由前端传入）；"
+                    "留空则自动取正文首个一级标题，再兜底为「粘贴文本」"
+    )
     source: Optional[str] = Field(
         None,
         description="'live' 真实跑；'demo:<id>' 走预生成报告（秒级）"
@@ -32,6 +37,10 @@ class HealthResponse(BaseModel):
     api_key_configured: bool
     model: str
     base_url: str = ""
+    db_writable: bool = True
+    db_path: str = ""
+    db_note: str = ""
+    db_count: int = 0
 
 
 class ReportSummary(BaseModel):

@@ -58,6 +58,7 @@ html, body {
 .dot-grey { background: var(--text-dim); }
 .dot-green { background: var(--good); }
 .dot-red { background: var(--bad); }
+.dot-warn { background: var(--warn); }
 
 /* === Tabs === */
 .tabs {

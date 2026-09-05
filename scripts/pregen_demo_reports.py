@@ -14,20 +14,10 @@ import sys
 import time
 from pathlib import Path
 
-
-def _json_default(o):
-    """sympy Integer/Float/Bool 等非原生类型 → 原生 Python 值。"""
-    if hasattr(o, "is_integer") and o.is_integer:
-        return int(o)
-    if hasattr(o, "is_number") and hasattr(o, "as_real_imag"):
-        return float(o)
-    if isinstance(o, (set, frozenset)):
-        return list(o)
-    return str(o)
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from edu_eval.api.serialize import json_default as _json_default  # noqa: E402
 from edu_eval.config import Hy3Config  # noqa: E402
 from edu_eval.eval.run_eval import EvalContext, evaluate_from_text  # noqa: E402
 
@@ -47,13 +37,18 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     key = os.environ.get("HY3_API_KEY", "").strip()
-    if not key:
-        print("✗ 未配置 HY3_API_KEY，跳过预生成")
-        print("  请先 set -a; source .env; set +a 再跑本脚本")
+    mock = os.environ.get("HY3_MOCK", "").strip() == "1"
+    if not key and not mock:
+        print("✗ 未配置 HY3_API_KEY 且 HY3_MOCK!=1，跳过预生成")
+        print("  请先 set -a; source .env; set +a 再跑本脚本，或设 HY3_MOCK=1 用占位数据")
         return 1
 
     cfg = Hy3Config.from_env()
-    print(f"使用模型：{cfg.model} @ {cfg.base_url}\n")
+    # demo 脚本里强制设置 HY3_MOCK=1 时，cfg.mock 可能仍是 False（from_env 不读 mock），
+    # 这里显式同步：HY3_MOCK=1 即视为 mock 模式（让 demo 启动能跑通）。
+    if mock:
+        cfg.mock = True
+    print(f"使用模型：{cfg.model} @ {cfg.base_url}（mock={cfg.mock}）\n")
 
     ok = 0
     for sid, grade in SAMPLES:
