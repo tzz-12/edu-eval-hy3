@@ -72,7 +72,7 @@ $$(".tab").forEach(b => b.addEventListener("click", () => {
       box.innerHTML = d.samples.map(s => `
         <button data-demo="${escHtml(s.id)}" title="点击秒级演示">
           🚀 ${escHtml(s.label)}
-          <span class="badge-mini ${s.admission==="PASS"?"badge-pass":"badge-fail"}">${escHtml(s.admission||"")} ${s.total_score ?? ""}</span>
+          <span class="badge-mini badge-${(s.admission||"NE").toLowerCase()}">${escHtml(s.admission||"—")} ${s.total_score ?? ""}</span>
         </button>
       `).join("");
       $$(".demo-buttons button[data-demo]").forEach(b =>
@@ -82,9 +82,17 @@ $$(".tab").forEach(b => b.addEventListener("click", () => {
   loadHistory();
 })();
 
-// ============== 文件上传 ==============
+// ============== 文本输入 ==============
 // 记住来源文件名，提交时带给后端，历史列表里显示它而不是正文前 N 字
 let currentFileName = "";
+
+function updateCount() {
+  const n = $("#textInput").value.trim().length;
+  $("#charCount").textContent = n ? `${n.toLocaleString()} 字` : "0 字";
+}
+
+$("#textInput").addEventListener("input", updateCount);
+updateCount();
 
 $("#fileInput").addEventListener("change", async (e) => {
   const f = e.target.files[0];
@@ -94,6 +102,15 @@ $("#fileInput").addEventListener("change", async (e) => {
     $("#textInput").value = `(PDF 上传由后端处理：${f.name})\n\n请等待评测时后端读 PDF…`;
   } else {
     $("#textInput").value = await f.text();
+  }
+  updateCount();
+});
+
+// ⌘/Ctrl + Enter 提交（长文本场景下比挪鼠标去点按钮顺手）
+$("#textInput").addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    $("#evaluateBtn").click();
   }
 });
 
@@ -165,8 +182,8 @@ function renderReport(r) {
   $("#reportContent").classList.remove("hidden");
 
   const adm = r.admission || "NE";
-  $("#admissionBadge").textContent = adm;
-  $("#admissionBadge").className = "metric-value admission-" + adm;
+  // 准入改药丸：比彩色大字更克制，也不至于和「总分」的大号数字抢注意力
+  $("#admissionBadge").innerHTML = `<span class="pill pill-${adm}">${escHtml(adm)}</span>`;
   const agg = r.aggregation || {};
   $("#totalScore").textContent = agg.total_score != null ? `${agg.total_score}/100` : "—";
   $("#gradeLevel").textContent = agg.grade || "—";
@@ -201,6 +218,7 @@ function renderRadar(scores) {
 
   if (radarChart) radarChart.destroy();
   const ctx = $("#radarChart").getContext("2d");
+  // 配色跟 style.css 的浅色主题对齐（Chart.js 不走 CSS 变量，只能写死）
   radarChart = new Chart(ctx, {
     type: "radar",
     data: {
@@ -208,10 +226,13 @@ function renderRadar(scores) {
       datasets: [{
         label: "得分",
         data,
-        backgroundColor: "rgba(78,201,176,0.18)",
-        borderColor: "#4ec9b0",
-        pointBackgroundColor: "#4ec9b0",
-        pointRadius: 4,
+        backgroundColor: "rgba(13,148,136,0.14)",
+        borderColor: "#0d9488",
+        borderWidth: 2,
+        pointBackgroundColor: "#0d9488",
+        pointBorderColor: "#ffffff",
+        pointBorderWidth: 1.5,
+        pointRadius: 3.5,
       }],
     },
     options: {
@@ -220,13 +241,21 @@ function renderRadar(scores) {
       scales: {
         r: {
           min: 0, max: 5,
-          ticks: { stepSize: 1, color: "#858585", backdropColor: "transparent" },
-          grid: { color: "rgba(255,255,255,0.08)" },
-          angleLines: { color: "rgba(255,255,255,0.08)" },
-          pointLabels: { color: "#d4d4d4", font: { size: 11 } },
+          ticks: { stepSize: 1, color: "#94a3b8", backdropColor: "transparent", font: { size: 10 } },
+          grid: { color: "rgba(22,32,43,0.08)" },
+          angleLines: { color: "rgba(22,32,43,0.08)" },
+          pointLabels: { color: "#5b6b7c", font: { size: 11 } },
         },
       },
-      plugins: { legend: { labels: { color: "#d4d4d4" } } },
+      plugins: {
+        legend: { labels: { color: "#5b6b7c", boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          backgroundColor: "#16202b",
+          padding: 8,
+          displayColors: false,
+          callbacks: { label: (c) => ` ${c.parsed.r} / 5` },
+        },
+      },
     },
   });
 }
@@ -262,15 +291,21 @@ function renderDimDetail(scores, arbitration) {
     const ne = s.ne ? `<span class="dim-score ne">NE</span>` :
             `<span class="dim-score score-${s.score}">${s.score}/5</span>`;
     const cls = s.ne ? "ne" : (s.score >= 4 ? "pass" : (id === "2" ? "g0" : "fail"));
-    const arb = (arbitration || []).includes(id) ? `<span class="badge-mini badge-fail">已仲裁</span>` : "";
+    const arb = (arbitration || []).includes(id) ? `<span class="badge-mini badge-warn">已仲裁</span>` : "";
+    // 得分条：1-5 分映射成 20%-100% 宽度，扫一眼就能比较维度高低
+    const pct = s.ne ? 0 : Math.max(0, Math.min(5, Number(s.score) || 0)) * 20;
     return `
       <div class="dim-item ${cls}">
         <div class="dim-item-head">
-          <span><span class="dim-id">${id}</span><span class="dim-name">${escHtml(DIM_NAMES[id])}</span>
-            <span class="dim-priority">${DIM_PRI[id]}</span>${arb}</span>
+          <span class="dim-title">
+            <span class="dim-id">${id}</span>
+            <span class="dim-name">${escHtml(DIM_NAMES[id])}</span>
+            <span class="dim-priority">${DIM_PRI[id]}</span>${arb}
+          </span>
           ${ne}
         </div>
-        ${s.evidence ? `<div class="dim-evidence">📎 ${escHtml(String(s.evidence).slice(0,200))}</div>` : ""}
+        <div class="dim-bar"><span style="width:${pct}%"></span></div>
+        ${s.evidence ? `<div class="dim-evidence">${escHtml(String(s.evidence).slice(0,200))}</div>` : ""}
       </div>
     `;
   }).join("");
@@ -288,7 +323,7 @@ function renderRules(rules) {
     ${findings.map(f => {
       const cls = {fail:"rule-fail",warn:"rule-warn",pass:"rule-pass"}[f.verdict] || "";
       const sym = {fail:"✗",warn:"△",pass:"✓"}[f.verdict] || "·";
-      return `<div class="rule-item ${cls}">[${f.rule_id||""}] ${sym} ${escHtml(f.evidence || f.reason || "")}</div>`;
+      return `<div class="rule-item ${cls}"><span class="rule-id">${escHtml(f.rule_id||"—")}</span>${sym} ${escHtml(f.evidence || f.reason || "")}</div>`;
     }).join("")}
   `;
 }
@@ -314,19 +349,26 @@ async function loadHistory() {
   try {
     const list = await api("GET", "/api/reports");
     const body = $("#historyBody");
+
+    // Tab 上的条数徽标
+    const badge = $("#historyTabBadge");
+    if (badge) {
+      badge.textContent = String(list.length);
+      badge.classList.toggle("hidden", list.length === 0);
+    }
     if (!list.length) {
       body.innerHTML = `<tr><td colspan="8" class="loading">还没有历史记录</td></tr>`;
       return;
     }
     body.innerHTML = list.map(r => `
       <tr>
-        <td>${r.id}</td>
-        <td>${fmtTime(r.created_at)}</td>
+        <td class="num">${r.id}</td>
+        <td class="num">${fmtTime(r.created_at)}</td>
         <td>${escHtml(r.grade||"—")}</td>
-        <td class="admission-${r.admission}">${escHtml(r.admission)}</td>
-        <td>${r.total_score ?? "—"}</td>
-        <td>${r.dual_sample?"✓":"✗"}</td>
-        <td title="${escHtml(r.file_name||"")}">${escHtml((r.file_name||"").slice(0,40))}</td>
+        <td title="${escHtml(r.file_name||"")}">${escHtml((r.file_name||"—").slice(0,40))}</td>
+        <td><span class="badge-mini badge-${(r.admission||"NE").toLowerCase()}">${escHtml(r.admission||"—")}</span></td>
+        <td class="num">${r.total_score ?? "—"}</td>
+        <td>${r.dual_sample?"✓":"—"}</td>
         <td><button data-id="${r.id}">查看</button></td>
       </tr>
     `).join("");
