@@ -29,7 +29,7 @@ import json
 import os
 from typing import Any, Optional
 
-PROMPT_VERSION = "v4"  # v4: Judge 提示注入 [KB#cmp-xxx] 课标核心素养原文（旧缓存自动失效）
+PROMPT_VERSION = "v5"  # v5: 维度9 锚点新增伪启发反模式识别与降级规则（旧缓存自动失效）
 # 版本沿革：v3 维度锚点嵌入核心素养定语 + 新增 competency_link 字段
 
 
