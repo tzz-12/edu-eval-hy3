@@ -5,161 +5,109 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EduEval · AI 生成 K-12 课件质量评测</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Chart.js 用于雷达图 -->
+  <!-- Chart.js：总分仪表盘 / 九维雷达 / 维度条形 / 一致性环形 / 规则分布 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo">EE</span>
-      <h1>EduEval</h1>
-      <span class="tagline">AI 生成 K-12 课件质量评测 · 基于混元 Hy3</span>
-    </div>
-    <div class="status" id="healthBadge">
-      <span class="dot dot-grey"></span>
-      <span id="healthText">检查中…</span>
-    </div>
-  </header>
+  <div class="app">
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="evaluate">评测</button>
-    <button class="tab" data-tab="report">报告</button>
-    <button class="tab" data-tab="history">历史 <span id="historyTabBadge" class="badge hidden">0</span></button>
-  </nav>
+    <!-- ============ 侧栏：历史会话 ============ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <div class="brand">
+          <span class="logo">EE</span>
+          <div class="brand-text">
+            <strong>EduEval</strong>
+            <span>K-12 课件质量评测</span>
+          </div>
+        </div>
+        <button id="newChatBtn" class="btn-new">＋ 新建评测</button>
+      </div>
 
-  <main>
-    <!-- ========== 评测页 ========== -->
-    <section id="tab-evaluate" class="tab-pane active">
-      <div class="card">
-        <h2>课件文本</h2>
-        <p class="hint">粘贴 Markdown 或纯文本，也可以直接上传 .md / .txt / .pdf</p>
-        <textarea id="textInput" placeholder="在此粘贴待评测的课件文本…&#10;&#10;示例：一份二次函数的教学设计，含教学目标、教学环节、评价任务…"></textarea>
-        <div class="file-row">
-          <input type="file" id="fileInput" accept=".md,.txt,.pdf">
-          <span class="counter" id="charCount">0 字</span>
+      <div class="conv-list" id="convList">
+        <div class="loading">加载中…</div>
+      </div>
+
+      <div class="sidebar-foot">
+        <div class="status" id="healthBadge">
+          <span class="dot dot-grey"></span>
+          <span>检查中…</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ 主区：对话流 ============ -->
+    <main class="chat">
+      <header class="chat-head">
+        <button class="icon-btn" id="menuBtn" title="切换会话列表">☰</button>
+        <div class="chat-title">
+          <span id="chatTitle">新评测</span>
+          <span class="chat-sub" id="chatSub"></span>
+        </div>
+        <div class="head-right">
+          <span class="head-model" id="headModel"></span>
+        </div>
+      </header>
+
+      <div class="messages" id="messages">
+        <!-- 空态 -->
+        <div class="welcome" id="welcome">
+          <div class="welcome-inner">
+            <div class="welcome-logo">EE</div>
+            <h2>把课件交给 EduEval 评一评</h2>
+            <p>粘贴一份 AI 生成的教案或课件，系统会从 9 个维度给出评分，
+               用规则层零成本拦截知识性硬伤，并用双采样自一致压住 LLM 打分的随机性。</p>
+
+            <div class="welcome-demo">
+              <div class="welcome-demo-title">或直接从演示样本开始</div>
+              <div class="demo-grid" id="demoButtons">
+                <span class="loading">加载中…</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>评测配置</h2>
-        <div class="config-grid">
-          <label>
-            <span>声明年级</span>
+      <!-- ============ 输入区 ============ -->
+      <div class="composer">
+        <div class="composer-tools">
+          <label class="tool">
+            <span>年级</span>
             <select id="gradeSelect"><option value="">加载中…</option></select>
           </label>
-          <label class="checkbox">
+          <label class="tool chk">
             <input type="checkbox" id="dualSampleCheck" checked>
-            <span>启用双采样自一致</span>
+            <span>双采样自一致</span>
           </label>
-          <label>
-            <span>分差阈值（&gt; 此值触发层内仲裁）</span>
+          <label class="tool">
+            <span>分差阈值</span>
             <input type="number" id="dualThresholdInput" value="1" min="0" max="4">
           </label>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>演示快捷入口</h2>
-        <p class="hint">好样本 vs 坏样本对照，读预生成报告，秒级返回、不消耗额度</p>
-        <div id="demoButtons" class="demo-buttons">
-          <span class="loading">加载中…</span>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button id="evaluateBtn" class="primary">开始评测</button>
-        <span id="evaluateStatus" class="status-text"></span>
-        <span class="status-text" style="margin-left:auto">
-          按 <span class="kbd">⌘</span><span class="kbd">Enter</span> 快速提交
-        </span>
-      </div>
-
-      <div id="evaluateProgress" class="progress hidden">
-        <div class="spinner"></div>
-        <span id="progressText">正在调 LLM 评测…（同步阻塞 30-90s）</span>
-      </div>
-    </section>
-
-    <!-- ========== 报告页 ========== -->
-    <section id="tab-report" class="tab-pane">
-      <div id="reportEmpty" class="empty">
-        <p>还没有报告。点击「评测」或选择上方的「演示快捷入口」生成。</p>
-      </div>
-
-      <div id="reportContent" class="hidden">
-        <div class="card summary-card">
-          <div class="summary-grid">
-            <div class="metric">
-              <div class="metric-label">准入判定</div>
-              <div class="metric-value" id="admissionBadge">-</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">加权总分</div>
-              <div class="metric-value" id="totalScore">-</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">等级</div>
-              <div class="metric-value" id="gradeLevel">-</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">结论</div>
-              <div class="metric-value verdict" id="verdict">-</div>
-            </div>
-          </div>
+          <span class="tool-spacer"></span>
+          <button class="tool-btn" id="attachBtn">上传 .md/.txt/.pdf</button>
+          <input type="file" id="fileInput" accept=".md,.txt,.pdf" hidden>
+          <span class="counter" id="charCount">0 字</span>
         </div>
 
-        <div class="two-col">
-          <div class="card">
-            <h3>九维雷达</h3>
-            <canvas id="radarChart" height="300"></canvas>
-            <div id="radarEmptyHint" class="hint hidden">全部维度未出分（G0 知识准确性未通过，评分已终止）</div>
-            <div id="g0Notice" class="notice hidden"></div>
-          </div>
-          <div class="card">
-            <h3>双采样自一致</h3>
-            <div id="dualSampleBlock"><span class="hint">未启用</span></div>
-          </div>
+        <div class="composer-input">
+          <textarea id="textInput" rows="1"
+            placeholder="粘贴课件 / 教案文本，或上传文件…　（⌘/Ctrl + Enter 发送）"></textarea>
+          <button id="sendBtn" class="send" title="发送">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M3.4 20.4l17.45-7.48a1 1 0 000-1.84L3.4 3.6a.99.99 0 00-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"
+                    fill="currentColor"></path>
+            </svg>
+          </button>
         </div>
-
-        <div class="card">
-          <h3>各维度详情</h3>
-          <div id="dimDetail"></div>
-        </div>
-
-        <div class="two-col">
-          <div class="card">
-            <h3>规则层（G0 判定）</h3>
-            <div id="rulesBlock"></div>
-          </div>
-          <div class="card">
-            <h3>环境告警</h3>
-            <div id="warningsBlock"><span class="hint">无</span></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>改进建议</h3>
-          <ul id="suggestionsList"></ul>
+        <div class="composer-foot">
+          <span id="composerHint" class="composer-hint"></span>
+          <span class="kbd-hint">按 <span class="kbd">⌘</span><span class="kbd">Enter</span> 发送</span>
         </div>
       </div>
-    </section>
+    </main>
+  </div>
 
-    <!-- ========== 历史页 ========== -->
-    <section id="tab-history" class="tab-pane">
-      <div class="card">
-        <h2>评测历史</h2>
-        <table id="historyTable">
-          <thead>
-            <tr><th>ID</th><th>时间</th><th>年级</th><th>名称</th><th>准入</th><th>总分</th><th>双采样</th><th></th></tr>
-          </thead>
-          <tbody id="historyBody">
-            <tr><td colspan="8" class="loading">加载中…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-
+  <div class="scrim" id="scrim"></div>
   <script src="app.js"></script>
 </body>
 </html>

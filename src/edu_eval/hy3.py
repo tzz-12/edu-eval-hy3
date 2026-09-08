@@ -137,18 +137,112 @@ class Hy3Client:
         return json.loads(self.judge(system, user, temperature=temperature, max_tokens=max_tokens))
 
 
+# --- 演示画像：让 mock 报告「有强弱项」，图表才有东西可画 ----------------------
+# 为什么不能全 5 分：雷达图会画成满圆、维度条形图等高、双采样零分歧（一致性
+# 面板永远 100%），五个图表没一个能验证到展示链路。这份画像把短板放在 AI 生成
+# 课件的真实弱项上（学情分析 7、启发探究 9），教育上也说得通。
+#
+# 注意：短板维度（7 学情分析、9 启发探究）**不给 shift** —— 两次采样一致打低分，
+# 短板才能在最终分里保留下来。若给短板加 shift，平均后会被拉到 4 分，
+# 雷达图又变回接近满圆。分歧要放在中等维度上。
+_MOCK_BASE = {
+    "1": 5, "2": 5, "3": 4, "4": 3, "5": 5,
+    "6": 5, "7": 3, "8": 4, "9": 3, "A": 5,
+}
+# 双采样视角差：learner_view 相对 strict_rubric 的偏移。
+# 维度 4 偏移 2（3→5）会越过默认阈值 1 触发层内仲裁，一致性面板才有内容可看。
+# 分数会被 clamp 到 1–5，所以想造出「分差 2」必须从 base 3 起跳。
+_MOCK_LENS_SHIFT = {"3": 1, "4": 2, "8": 1}
+
+_MOCK_DIM_SHORT = {
+    "1": "教学目标", "2": "知识准确", "3": "学段适配", "4": "环节设计", "5": "表述清晰",
+    "6": "安全合规", "7": "学情分析", "8": "教-学-评", "9": "启发探究", "A": "格式可读",
+}
+
+
+def _mock_evidence(did: str, score: int) -> str:
+    name = _MOCK_DIM_SHORT.get(did, f"维度{did}")
+    if score >= 5:
+        return f"（演示模式）{name}：目标与证据明确，未发现实质问题。"
+    if score == 4:
+        return f"（演示模式）{name}：整体合格，个别环节仍有提升空间。"
+    if score == 3:
+        return f"（演示模式）{name}：基本达标，但存在明显短板，建议补充针对性设计。"
+    return f"（演示模式）{name}：存在实质缺陷，需要重点修改后复审。"
+
+
 def _mock_response(system: str, user: str) -> str:
-    """演示/测试模式：返回确定性占位 JSON，不调用任何外部服务。"""
-    ids = re.findall(r"维度\s*([0-9A-Za-z]+)", user)
-    # 排除 JSON schema 示例中的占位词“维度id”
-    ids = [i for i in dict.fromkeys(ids) if i.lower() != "id"]  # 去重保序
-    scores = {str(i): {"score": 3, "evidence": "（演示模式占位，未连接 Hy3）", "ne": False} for i in ids}
+    """演示/测试模式：返回确定性占位 JSON，不调用任何外部服务。
+
+    演示目标：让前端能展示一份**合理且有区分度**的报告——不是模拟真实
+    Judge 评分（真实评分走 `evaluate_from_text` + `HY3_*` 环境变量），
+    而是把「雷达有起伏、条形有分档、双采样有分歧」的展示链路验证到位。
+
+    维度 id 取自 system 角色对应的 JUDGE_GROUPS（fact→{2,3} /
+    design→{1,4,7,8,9} / expression_safety→{5,6,A}），不再依赖正则
+    抓 prompt 字面 —— 之前的正则会被 JSON schema 里的「维度id」污染，
+    而且只有 fact Judge 的 prompt 真的写了「维度 X」字样。
+    """
+    # 1. 从 system prompt 前缀识别 Judge 角色（与 judges/*.py 的 system 字段严格对应）
+    if "事实与学段裁判" in system:
+        ids = ["2", "3"]
+    elif "教学设计裁判" in system:
+        ids = ["1", "4", "7", "8", "9"]
+    elif "表达与安全裁判" in system:
+        ids = ["5", "6", "A"]
+    else:
+        # 兜底：兼容旧 mock（按 prompt 字面抓维度 id）。排除 schema 里的「维度id」。
+        raw = re.findall(r"维度\s*([0-9A-Za-z]+)", user)
+        ids = [i for i in dict.fromkeys(raw) if i.lower() != "id"]
+
+    # 2. 识别双采样视角。lens 指令由 BaseJudge._lens_directive 注入 prompt，
+    #    两次采样各调一次 —— 不区分视角的话两次返回完全相同，一致性永远是 100%。
+    blob = system + "\n" + user
+    if "严格按上方量规" in blob:
+        lens = "strict_rubric"
+    elif "学习者" in blob:
+        lens = "learner_view"
+    else:
+        lens = None
+
+    # 3. 嗅探样本类型，对已知缺陷针对性降分（仅演示用，不影响真实评测）
+    # 公式错误：02_bad_formula 末尾追加的「易错点 1/2/3」里的错误公式片段
+    has_formula_bug = any(
+        p in user for p in [
+            "(x+3)² = x² + 9", "(x+3)²=x²+9",
+            "a²+b²=c（少了一个 ²", "a²+b²=c²",
+            "√(b²-4ac)", "b²-4ac 必须大于等于 0",
+        ]
+    )
+    # 伪启发包装：03_bad_fake_socratic 末尾追加的「启发探究」节
+    has_fake_socratic = ("启发探究" in user and "齐声应答" in user)
+
+    def _score(did: str) -> int:
+        # 硬伤优先于画像：有确定性缺陷的维度直接给低分
+        if has_formula_bug and did == "2":
+            return 1      # 知识准确性：公式错误是硬伤
+        if has_fake_socratic and did == "9":
+            return 1      # 启发探究（维度 9）：只有提问外壳，没有认知引导。
+                          # 给 1 分而非 2 分：维度 9 权重不高，扣得轻会让伪启发样本
+                          # 与好样本只差 2 分，演示时看不出系统识别出了这个问题。
+        base = _MOCK_BASE.get(did, 4)
+        if lens == "learner_view":
+            base += _MOCK_LENS_SHIFT.get(did, 0)
+        return max(1, min(5, base))
+
+    scores = {}
+    for did in ids:
+        s = _score(did)
+        scores[did] = {"score": s, "evidence": _mock_evidence(did, s), "ne": False}
+
     return json.dumps(
         {
             "admission": "PASS",
             "redline": False,
             "scores": scores,
-            "suggestions": ["（演示模式）未连接 Hy3，所有维度返回占位分 3，仅用于验证流程贯通。"],
+            "suggestions": [
+                "（演示模式）分数由确定性画像生成，用于验证前端展示链路，不构成真实评测结论。",
+            ],
         },
         ensure_ascii=False,
     )

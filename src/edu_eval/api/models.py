@@ -37,6 +37,9 @@ class HealthResponse(BaseModel):
     api_key_configured: bool
     model: str
     base_url: str = ""
+    # 演示模式（HY3_MOCK=1）：分数由确定性画像生成，不调真实模型、不耗额度。
+    # 前端据此显示「演示模式」而非「API 未配置」——后者会被误读成系统坏了。
+    demo_mode: bool = False
     db_writable: bool = True
     db_path: str = ""
     db_note: str = ""

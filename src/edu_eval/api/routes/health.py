@@ -25,11 +25,14 @@ def health() -> HealthResponse:
     """不暴露 key，仅返回是否已配置。"""
     key = os.environ.get("HY3_API_KEY", "").strip()
     db = db_status()
+    demo = (os.environ.get("HY3_MOCK") or "0").strip() in ("1", "true", "True")
     return HealthResponse(
-        ok=bool(key),
+        ok=bool(key) or demo,
         api_key_configured=bool(key),
-        model=os.environ.get("HY3_MODEL", "未配置"),
+        model="演示模式（未连接真实模型）" if demo
+              else os.environ.get("HY3_MODEL", "未配置"),
         base_url=os.environ.get("HY3_BASE_URL", ""),
+        demo_mode=demo,
         db_writable=db["db_writable"],
         db_path=db["db_path"],
         db_note=db["db_note"],
