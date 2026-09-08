@@ -574,9 +574,20 @@ function panelDims(r, cid) {
       </div>`;
   }).join("");
 
+  let emptyHint = `<div class="hint">没有维度出分。</div>`;
+  if (!items && (r.admission === "FAIL")) {
+    const why = (r.rules && r.rules.findings || []).filter(f => f.verdict === "fail");
+    emptyHint = `<div class="hint">
+      <strong>未通过知识准入闸门（G0），未进入全维度评分。</strong><br>
+      存在 ${why.length} 项确定性知识缺陷，系统按设计直接判定 FAIL 而不给总分——
+      宁可不出分，也不让"有硬伤的课件"拿到一个看起来还行的分数。
+      ${why.length ? "详见「规则层」标签页。" : ""}
+    </div>`;
+  }
+
   return `
   <div class="rpanel" data-p="dims">
-    ${items || `<div class="hint">没有维度出分。</div>`}
+    ${items || emptyHint}
   </div>`;
 }
 

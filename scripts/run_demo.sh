@@ -59,7 +59,7 @@ cmd_start() {
   echo "启动 EduEval Demo on http://0.0.0.0:$PORT（mode=$mode，日志 $LOG）"
   nohup /Users/tzz/.workbuddy/binaries/python/versions/3.13.12/bin/python3 \
       -m uvicorn edu_eval.api.main:fastapi_app \
-      --host 0.0.0.0 --port "$PORT" --log-level info \
+      --host "${HOST:-127.0.0.1}" --port "$PORT" --log-level info \
       >> "$LOG" 2>&1 &
   echo $! > "$PIDFILE"
   sleep 2
