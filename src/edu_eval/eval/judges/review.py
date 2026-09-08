@@ -12,6 +12,21 @@ from edu_eval.eval.judges.base import BaseJudge
 # 要求整段证据是连续子串（ultra-550b 等模型常给"转述 + 引号公式"式证据）。
 _MATH_SPAN = re.compile(r"[A-Za-z0-9+\-*/^=().,²³√π≈≠≤≥%]+")
 
+# 上标字符 → 普通数字。PDF 抽取常把上标渲染成普通字形（y=a(x-h)² 与
+# y=a(x-h)2），若直接比对会因 ²≠2 误判"证据编造"，故比对前统一归一化。
+_SUPERSCRIPT_MAP = {
+    "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5",
+    "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+}
+
+
+def _norm_math(s: str) -> str:
+    """比对前归一化：上标字符→普通数字、脱字符指数 ^2→2、去空白。"""
+    for sup, base in _SUPERSCRIPT_MAP.items():
+        s = s.replace(sup, base)
+    s = re.sub(r"\^(\d+)", r"\1", s)  # x^2 → x2，与 x² 对齐
+    return "".join(s.split())
+
 
 class ReviewJudge(BaseJudge):
     role = "review"
@@ -47,7 +62,7 @@ class ReviewJudge(BaseJudge):
           且会由「分数分歧 → 跨层仲裁」这条更可靠的路径兜底）。
         """
         problems: List[Dict[str, str]] = []
-        norm_text = "".join(text.split())
+        norm_text = _norm_math(text)
         for did, s in scores.items():
             if not isinstance(s, dict) or s.get("ne"):
                 continue
@@ -58,7 +73,7 @@ class ReviewJudge(BaseJudge):
             spans = _MATH_SPAN.findall(ev)
             if spans:
                 # 关键公式必须能在原文找到（归一化后），否则才算编造
-                if not any("".join(sp.split()) in norm_text for sp in spans):
+                if not any(_norm_math(sp) in norm_text for sp in spans):
                     problems.append({"dim": str(did),
                                      "reason": "证据中的公式/符号在原文中不存在（疑似编造）"})
         return problems
