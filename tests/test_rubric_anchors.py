@@ -109,3 +109,67 @@ def test_all_dimensions_have_anchor_bands():
         assert "1 分" in d.anchors, f"维度 {d.id} 缺 1 分锚点"
         assert "3 分" in d.anchors, f"维度 {d.id} 缺 3 分锚点"
         assert "5 分" in d.anchors, f"维度 {d.id} 缺 5 分锚点"
+
+
+# ---------------------------------------------------------------------------
+# 维度 8 / 维度 4：判前必查清单（2026-09-09 判别力实验后补）
+#
+# 判别力实验（scripts/run_discrimination.py，base/mild/severe 三档对照）实测：
+#   维度8  base=3 mild=3 severe=3  ← 完全无判别力
+#   维度4  base=3 mild=3 severe=2  ← 轻度未识别
+# 根因不是"规则缺失"——锚点里本来就有「没有任何评价任务时最高 2 分」这类约束。
+# 而是 Judge 根本没去做那项检查：维度 8 的证据引用的是教学目标和教学环节，
+# 压根没看被注入的评价设计，却照样给 3 分。
+# 修复方式是加「判前必查」清单，强迫 Judge 先定位再打分。
+# ---------------------------------------------------------------------------
+
+
+def test_dim8_requires_locating_assessment_before_scoring():
+    """维度 8 必须先定位评价内容，否则不许打分。
+
+    实测证据：注入「删除评价设计」后 Judge 仍给 3 分，
+    而它引用的证据是教学目标和教学环节 —— 说明它压根没检查"评"这一环。
+    """
+    anchors = _dim("8").anchors
+    assert "判前必查" in anchors
+    # 必须先定位评价内容（可能叫评价设计/达标检测/课堂检测等）
+    assert "定位" in anchors and "评价" in anchors
+    # 只引用目标或活动、没引用评价原文的，判定无效
+    assert "未做评价检查" in anchors
+
+
+def test_dim8_downgrades_vague_assessment():
+    """笼统评价（按考试分数/按表现打分）必须降级。
+
+    这类表述看似"有评价"，实际无法反映任何一条目标是否达成，
+    是 AI 生成课件最典型的敷衍写法，不降级就等于没判别力。
+    """
+    anchors = _dim("8").anchors
+    assert "降级规则" in anchors
+    assert "不得高于 2 分" in anchors
+    assert "考试分数" in anchors or "表现打分" in anchors
+
+
+def test_dim4_requires_per_stage_three_elements():
+    """维度 4 要逐环节核对三要素，不能只看环节标题齐不齐。"""
+    anchors = _dim("4").anchors
+    assert "判前必查" in anchors
+    assert "学生任务" in anchors and "反馈" in anchors
+
+
+def test_dim4_downgrades_teacher_only_stages():
+    """只写教师动作的"环节齐全"必须降级。
+
+    反方向用例的意义：mild 档五个环节标题齐全、顺序也合理，
+    但每个环节都只有"教师讲解/板书/演示"，无学生任务与反馈。
+    若不加这条，Judge 会按 3 分锚点「主要环节可执行」放行，
+    轻度包装就永远识不破。
+    """
+    anchors = _dim("4").anchors
+    assert "降级规则" in anchors
+    assert "不得高于 2 分" in anchors
+    # 两个特征都要保留：「教师动作」是可观测识别特征，「环节齐全但无实质」是定性表述，
+    # 缺前者 Judge 认不出、缺后者 Judge 不知道该扣到哪一档（此处用 and 而非 or：
+    # 用 or 的话删掉任一特征测试仍会通过，等于没锁住）
+    assert "教师动作" in anchors
+    assert "环节齐全但无实质" in anchors
