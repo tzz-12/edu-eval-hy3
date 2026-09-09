@@ -88,9 +88,16 @@ def test_extensions_have_pep_license():
 
 def test_backfill_idempotent():
     """backfill_std_ref 二次运行不应改变 KB (幂等)."""
+    import pytest
+
     if not KB_JSONL.exists():
-        import pytest
         pytest.skip("KB 不存在")
+
+    # 依赖外部爬取仓库，不入库且 /tmp 会被系统清理 —— 缺失属环境问题，应 skip 而非 fail
+    from edu_eval.kb.backfill_std_ref import REPO
+    if not REPO.exists():
+        pytest.skip(f"pep-math-taxonomy 数据缺失：{REPO}"
+                    f"（可用 PEP_TAXONOMY_REPO 指向实际位置；该数据不入库）")
 
     pre = {}
     for line in open(KB_JSONL):

@@ -16,10 +16,14 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-REPO = Path('/tmp/pep-math-taxonomy')
+# 外部爬取的 pep-math-taxonomy 仓库（CC BY-SA 4.0），不入库、也不在 /tmp 长期留存。
+# 默认路径仅为历史约定：/tmp 会被系统定期清理，脚本因此失败会误导成代码 bug。
+# 实际使用时用 PEP_TAXONOMY_REPO 指向真实位置；缺失时测试应 skip 而非 fail。
+REPO = Path(os.environ.get('PEP_TAXONOMY_REPO', '/tmp/pep-math-taxonomy'))
 SOURCES = [
     ('data/topics.json', '7-up'),
     ('data/7-down/topics.json', '7-down'),
