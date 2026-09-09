@@ -1,99 +1,101 @@
 {
-  "base_doc": "data/samples/example_lesson.md",
+  "base_doc": "data/samples/example_lesson_v2.md",
   "base_meta": {
     "grade": "七年级上册",
-    "topic": "一元一次方程"
+    "topic": "一元一次方程",
+    "version": "人教版",
+    "lesson": "3.1 一元一次方程 第1课时"
   },
   "cases": [
     {
       "case_id": "dim1_mild",
       "dim": "1",
       "level": "mild",
-      "type": "no_goals",
-      "desc": "目标改用不可观察词（理解/掌握/体会），去掉行为动词与可评价条件，但目标条目仍在",
+      "type": "unmeasurable_goals",
+      "desc": "目标改用不可观察动词，课标依据/素养指向/达成标准全部降为空话，但表格格式与条目数不变",
       "file": "data/samples/discrimination/dim1_mild.md",
-      "chars": 517
+      "chars": 3545
     },
     {
       "case_id": "dim1_severe",
       "dim": "1",
       "level": "severe",
-      "type": "no_goals",
-      "desc": "目标替换为空话，完全不可观察、不可评价",
+      "type": "empty_goals",
+      "desc": "目标退化为与课题无关的通用口号",
       "file": "data/samples/discrimination/dim1_severe.md",
-      "chars": 478
-    },
-    {
-      "case_id": "dim4_mild",
-      "dim": "4",
-      "level": "mild",
-      "type": "no_structure",
-      "desc": "五个环节标题齐全，但每个环节只写教师动作，无学生任务、无时间分配、无反馈设计",
-      "file": "data/samples/discrimination/dim4_mild.md",
-      "chars": 498
-    },
-    {
-      "case_id": "dim4_severe",
-      "dim": "4",
-      "level": "severe",
-      "type": "no_structure",
-      "desc": "删除教学环节章节，改为无实质环节的标题",
-      "file": "data/samples/discrimination/dim4_severe.md",
-      "chars": 433
+      "chars": 3323
     },
     {
       "case_id": "dim7_mild",
       "dim": "7",
       "level": "mild",
-      "type": "no_learner",
-      "desc": "学情分析仍在，但泛泛而谈，无具体前置基础、无具体误区、未转化为教学策略",
+      "type": "generic_learner_analysis",
+      "desc": "保留已知/未知/待诊断小标题，但内容全为通用套话，无具体前置、无诊断方式",
       "file": "data/samples/discrimination/dim7_mild.md",
-      "chars": 542
+      "chars": 3489
     },
     {
       "case_id": "dim7_severe",
       "dim": "7",
       "level": "severe",
-      "type": "no_learner",
-      "desc": "学情分析压缩为一句无信息量的话",
+      "type": "no_learner_analysis",
+      "desc": "学情分析退化为一句无信息量的陈述",
       "file": "data/samples/discrimination/dim7_severe.md",
-      "chars": 498
+      "chars": 3340
+    },
+    {
+      "case_id": "dim4_mild",
+      "dim": "4",
+      "level": "mild",
+      "type": "teacher_only_procedure",
+      "desc": "环节标题、时间、格式齐全，但每条只写教师动作，无学生任务与反馈",
+      "file": "data/samples/discrimination/dim4_mild.md",
+      "chars": 2718
+    },
+    {
+      "case_id": "dim4_severe",
+      "dim": "4",
+      "level": "severe",
+      "type": "missing_procedure",
+      "desc": "教学环节整体缺失，改为由教师自行把握",
+      "file": "data/samples/discrimination/dim4_severe.md",
+      "chars": 2523
     },
     {
       "case_id": "dim8_mild",
       "dim": "8",
       "level": "mild",
-      "type": "no_assess",
-      "desc": "评价设计条目齐全，但只按表现/分数笼统评定，不与教学目标条目对应，无达成证据",
+      "type": "vague_assessment",
+      "desc": "保留评价表格格式，但证据降为打分/登记分数/评定等级，且无反馈补救路径",
       "file": "data/samples/discrimination/dim8_mild.md",
-      "chars": 545
+      "chars": 3340
     },
     {
       "case_id": "dim8_severe",
       "dim": "8",
       "level": "severe",
-      "type": "no_assess",
-      "desc": "评价设计退化为单一考试分数，无过程性达成证据",
+      "type": "no_valid_assessment",
+      "desc": "评价退化为按考试分数，并抽掉各环节的反馈方式与调整预案（消灭分布式评价证据）",
       "file": "data/samples/discrimination/dim8_severe.md",
-      "chars": 501
+      "chars": 2770
     },
     {
       "case_id": "dim9_mild",
       "dim": "9",
       "level": "mild",
-      "type": "no_heuristic",
-      "desc": "伪启发：有提问但全为封闭是非问，学生齐声应答，教师随即公布结论且不追问理由，文本自述无需独立思考",
+      "type": "fake_inquiry",
+      "desc": "启发探究改为封闭是非问+齐声应答+直接给结论；新授环节降为跟随操作、不要求说明理由",
       "file": "data/samples/discrimination/dim9_mild.md",
-      "chars": 594
+      "chars": 3350
     },
     {
       "case_id": "dim9_severe",
       "dim": "9",
       "level": "severe",
-      "type": "no_heuristic",
-      "desc": "删除启发探究，直接讲授结论让学生记忆默写",
+      "type": "no_inquiry",
+      "desc": "全篇无思考任务：启发探究改为直接讲授默写，新授改为教师演示，练习去掉自编与找错",
       "file": "data/samples/discrimination/dim9_severe.md",
-      "chars": 521
+      "chars": 2881
     }
   ]
 }

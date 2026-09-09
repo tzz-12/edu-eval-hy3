@@ -46,7 +46,8 @@ LOCATE_HINT = {
     "4": ["教师讲解", "教师板书", "教师演示", "自行把握"],
     "7": ["参差不齐", "因材施教", "基本情况一般"],
     "8": ["表现打分", "登记分数", "考试分数"],
-    "9": ["齐声", "是不是", "对不对", "无需学生独立思考", "记忆并默写"],
+    "9": ["齐声", "是不是", "对不对", "无需学生独立思考", "记忆并默写",
+          "不设提问", "观看演示", "抄写性质条文"],
 }
 
 
@@ -72,6 +73,8 @@ def main() -> int:
                     help="要跑的维度，逗号分隔（默认 1,4,7,8,9）")
     ap.add_argument("--min-drop", type=int, default=1,
                     help="base 与缺陷档的最小分差（默认 1）")
+    ap.add_argument("--out", default="results/discrimination.json",
+                    help="结果输出路径（只跑部分维度时另存，避免覆盖全量结果）")
     args = ap.parse_args()
 
     dims = [d.strip() for d in args.dims.split(",") if d.strip()]
@@ -150,7 +153,9 @@ def main() -> int:
     print(f"证据定位率（设计目标 ≥80%）：{located}/{total} = "
           f"{located / total * 100:.0f}%" if total else "")
 
-    out = ROOT / "results" / "discrimination.json"
+    out = Path(args.out)
+    if not out.is_absolute():
+        out = ROOT / out
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "model": cfg.model,

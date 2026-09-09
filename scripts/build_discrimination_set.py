@@ -54,20 +54,33 @@ def main() -> int:
 
     ok = True
     for c in spec["cases"]:
-        old, new = c["old"], c["new"]
-        if old not in base_text:
-            print(f"✗ {c['case_id']}：注入锚点未命中底稿，注入会静默失败\n"
-                  f"    锚点前 60 字：{old[:60]}")
+        # 一个用例可注入多段：高质量教案的维度证据是分布式的，
+        # 只改一处往往不足以让该维度真正失效。
+        patches = c.get("patches") or [{"old": c["old"], "new": c["new"]}]
+        text = base_text
+        failed = False
+        for i, p in enumerate(patches, 1):
+            old, new = p["old"], p["new"]
+            if old not in text:
+                print(f"✗ {c['case_id']} 第 {i}/{len(patches)} 段：锚点未命中，"
+                      f"注入会静默失败\n    锚点前 60 字：{old[:60]}")
+                failed = True
+                break
+            if old == new:
+                print(f"✗ {c['case_id']} 第 {i} 段：old 与 new 相同，等于没注入")
+                failed = True
+                break
+            before = text
+            text = text.replace(old, new, 1)
+            if text == before:
+                print(f"✗ {c['case_id']} 第 {i} 段：替换后文本未变化")
+                failed = True
+                break
+        if failed:
             ok = False
             continue
-        if old == new:
-            print(f"✗ {c['case_id']}：old 与 new 相同，等于没注入")
-            ok = False
-            continue
-
-        text = base_text.replace(old, new, 1)
         if text == base_text:
-            print(f"✗ {c['case_id']}：替换后文本未变化")
+            print(f"✗ {c['case_id']}：全部注入后文本未变化")
             ok = False
             continue
 
