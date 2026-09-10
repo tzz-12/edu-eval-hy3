@@ -65,10 +65,10 @@
       "case_id": "dim8_mild",
       "dim": "8",
       "level": "mild",
-      "type": "vague_assessment",
-      "desc": "保留评价表格格式，但证据降为打分/登记分数/评定等级，且无反馈补救路径",
+      "type": "assessment_without_followup",
+      "desc": "保留评价的收集方式与判断标准，但抽掉全部后续动作（补救/反馈/拓展），闭环断开",
       "file": "data/samples/discrimination/dim8_mild.md",
-      "chars": 3340
+      "chars": 3164
     },
     {
       "case_id": "dim8_severe",

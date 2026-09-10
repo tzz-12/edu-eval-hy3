@@ -29,7 +29,9 @@ import json
 import os
 from typing import Any, Optional
 
-PROMPT_VERSION = "v6"  # v6: 维度4/8 锚点新增「判前必查」清单与降级规则（旧缓存自动失效）
+PROMPT_VERSION = "v7"  # v7: 维度8 明确「达成证据」须含收集/判断标准/后续动作三环节（旧缓存自动失效）
+# 版本沿革：v6: 维度4/8 锚点新增「判前必查」清单与降级规则
+#           v5: 维度9 补伪启发反模式识别与降级规则
 # 版本沿革：v3 维度锚点嵌入核心素养定语 + 新增 competency_link 字段
 
 

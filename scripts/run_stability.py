@@ -61,9 +61,13 @@ def main() -> int:
     ap.add_argument("--grade", default="七年级上册")
     ap.add_argument("--threshold", type=float, default=0.5,
                     help="平均绝对分差阈值（方案要求 ≤0.5）")
+    ap.add_argument("--out", default="results/stability.json",
+                    help="结果输出路径（测多份文档时另存，避免互相覆盖）")
     args = ap.parse_args()
 
     doc = Path(args.doc)
+    if not doc.is_absolute():
+        doc = ROOT / doc          # 相对路径按项目根解析，否则 relative_to 会炸
     if not doc.exists():
         print(f"✗ 文档不存在：{doc}")
         return 1
@@ -107,7 +111,9 @@ def main() -> int:
     print(f"平均绝对偏差（全体维度）：{overall:.2f}   最大：{worst:.2f}   "
           f"阈值：{args.threshold}")
 
-    out = ROOT / "results" / "stability.json"
+    out = Path(args.out)
+    if not out.is_absolute():
+        out = ROOT / out
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "doc": str(doc.relative_to(ROOT)), "runs": args.n, "runs_detail": runs,

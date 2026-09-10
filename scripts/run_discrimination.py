@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import sys
 from pathlib import Path
 
@@ -34,6 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from edu_eval.config import Hy3Config  # noqa: E402
+from edu_eval.eval.cache import JudgeCache  # noqa: E402
 from edu_eval.eval.orchestrator import Orchestrator, load_kb_assets  # noqa: E402
 from edu_eval.parse.parsers import parse_file  # noqa: E402
 
@@ -63,6 +65,34 @@ def score_one(orch: Orchestrator, path: Path) -> dict:
     return rep.get("scores") or {}
 
 
+def score_repeat(orch: Orchestrator, path: Path, dim: str, n: int):
+    """同一文档重复采样 n 次，取**众数**作为该样本的分数。
+
+    为什么要重复采样
+    ----------------
+    实测发现：干净底稿（明确高质量）5 次重测完全一致，MAD=0.00；
+    但缺陷样本会落在决策边界上摇摆——dim9_severe 三次得分为 [2, 5, 2]，
+    单次采样抽到 5 就会误判成"完全没识别"，抽到 2 才是它的稳定行为。
+    判别力结论若建立在单次采样上，本质是掷骰子。
+
+    返回（众数分数, 各次原始分数, 众数对应的证据）。
+    """
+    scores, evidences = [], []
+    for _ in range(n):
+        s = score_one(orch, path)
+        scores.append((s.get(dim) or {}).get("score"))
+        evidences.append((s.get(dim) or {}).get("evidence") or "")
+    valid = [x for x in scores if x is not None]
+    if not valid:
+        return None, scores, ""
+    try:
+        mode = statistics.mode(valid)
+    except statistics.StatisticsError:
+        mode = valid[0]
+    idx = next(i for i, x in enumerate(scores) if x == mode)
+    return mode, scores, evidences[idx]
+
+
 def fmt(v):
     return "—" if v is None else str(v)
 
@@ -75,6 +105,8 @@ def main() -> int:
                     help="base 与缺陷档的最小分差（默认 1）")
     ap.add_argument("--out", default="results/discrimination.json",
                     help="结果输出路径（只跑部分维度时另存，避免覆盖全量结果）")
+    ap.add_argument("--repeat", type=int, default=1,
+                    help="每份样本重复采样次数，取众数（默认 1；缺陷样本建议 3）")
     args = ap.parse_args()
 
     dims = [d.strip() for d in args.dims.split(",") if d.strip()]
@@ -86,27 +118,55 @@ def main() -> int:
     kb, gm, retriever, warns = load_kb_assets()
     orch = Orchestrator(cfg, kb=kb, grade_map=gm, retriever=retriever,
                         warnings=warns, dual_sample=False)
-    print(f"模型：{cfg.model}（mock={cfg.mock}，双采样=关）\n")
+    # 重复采样必须禁用缓存：同 prompt + 同文本会命中缓存直接返回，
+    # 那样"采样 3 次"实际是同一个结果，测不出真实的边界摇摆。
+    if args.repeat > 1:
+        orch.j_design.cache = JudgeCache(enabled=False)
+    print(f"模型：{cfg.model}（mock={cfg.mock}，双采样=关，"
+          f"重复采样={args.repeat}）\n")
 
     man = load_manifest()
     cases = [c for c in man["cases"] if c["dim"] in dims]
 
-    # base 只需跑一次
+    # base 各维度的众数（每个维度各自聚合，因为一次调用出全部维度）
     print("[base] 跑干净底稿 …", end=" ", flush=True)
-    base_scores = score_one(orch, SAMPLE_DIR / "base.md")
-    print("完成 →", " ".join(f"D{d}={fmt((base_scores.get(d) or {}).get('score'))}"
-                            for d in dims))
+    # 一次调用会同时返回全部维度，所以只跑 repeat 次再按维度聚合，
+    # 而不是每个维度各跑 repeat 次（否则白白多花 N 倍调用）。
+    base_runs = [score_one(orch, SAMPLE_DIR / "base.md")
+                 for _ in range(args.repeat)]
+    base_scores: dict[str, object] = {}
+    base_raw: dict[str, list] = {}
+    base_ev: dict[str, str] = {}
+    for d in dims:
+        vals = [(s.get(d) or {}).get("score") for s in base_runs]
+        evs = [(s.get(d) or {}).get("evidence") or "" for s in base_runs]
+        base_raw[d] = vals
+        valid = [v for v in vals if v is not None]
+        if not valid:
+            base_scores[d], base_ev[d] = None, ""
+            continue
+        try:
+            mode = statistics.mode(valid)
+        except statistics.StatisticsError:
+            mode = valid[0]
+        base_scores[d] = mode
+        base_ev[d] = evs[next(i for i, v in enumerate(vals) if v == mode)]
+    print("完成 →", " ".join(
+        f"D{d}={fmt(base_scores[d])}" +
+        (f"{base_raw[d]}" if args.repeat > 1 else "") for d in dims))
 
     results: dict[str, dict[str, dict]] = {d: {} for d in dims}
     for c in cases:
         print(f"[{c['case_id']}] …", end=" ", flush=True)
-        s = score_one(orch, SAMPLE_DIR / f"{c['case_id']}.md")
-        sc = (s.get(c["dim"]) or {}).get("score")
-        ev = (s.get(c["dim"]) or {}).get("evidence") or ""
+        sc, raw, ev = score_repeat(orch, SAMPLE_DIR / f"{c['case_id']}.md",
+                                   c["dim"], args.repeat)
         results[c["dim"]][c["level"]] = {"score": sc, "evidence": ev,
+                                         "raw": raw,
                                          "case": c["case_id"]}
         hit = any(k in ev for k in LOCATE_HINT.get(c["dim"], []))
-        print(f"维度{c['dim']}={fmt(sc)}  证据定位={'✓' if hit else '✗'}")
+        print(f"维度{c['dim']}={fmt(sc)}"
+              + (f" 各次{raw}" if args.repeat > 1 else "")
+              + f"  证据定位={'✓' if hit else '✗'}")
 
     # ---- 汇总 ----
     print("\n" + "=" * 66)
@@ -114,7 +174,7 @@ def main() -> int:
     print("-" * 66)
     all_ok = True
     for d in dims:
-        b = (base_scores.get(d) or {}).get("score")
+        b = base_scores.get(d)
         m = results[d].get("mild", {}).get("score")
         s = results[d].get("severe", {}).get("score")
         if b is None or m is None or s is None:
@@ -136,11 +196,11 @@ def main() -> int:
     print("-" * 66)
     n = len(dims)
     passed = sum(1 for d in dims
-                 if (base_scores.get(d) or {}).get("score") is not None
+                 if base_scores.get(d) is not None
                  and results[d].get("mild", {}).get("score") is not None
                  and results[d].get("severe", {}).get("score") is not None
-                 and (base_scores[d]["score"] - results[d]["severe"]["score"]) >= args.min_drop
-                 and (base_scores[d]["score"] - results[d]["mild"]["score"]) >= args.min_drop
+                 and (base_scores[d] - results[d]["severe"]["score"]) >= args.min_drop
+                 and (base_scores[d] - results[d]["mild"]["score"]) >= args.min_drop
                  and results[d]["mild"]["score"] >= results[d]["severe"]["score"])
     print(f"顺序正确率（设计目标 ≥90%）：{passed}/{n} = "
           f"{passed / n * 100:.0f}%" if n else "")
@@ -159,10 +219,16 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "model": cfg.model,
-        "base": {d: (base_scores.get(d) or {}).get("score") for d in dims},
+        "repeat": args.repeat,
+        "base": {d: base_scores.get(d) for d in dims},
+        "base_raw": {d: base_raw.get(d) for d in dims},
         "cases": results,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n明细已写入：{out.relative_to(ROOT)}")
+    try:
+        shown = out.relative_to(ROOT)
+    except ValueError:          # --out 给了项目外的绝对路径
+        shown = out
+    print(f"\n明细已写入：{shown}")
 
     print("\n结论：", "✓ 判别力达标" if all_ok else "✗ 判别力不足，需修 rubric")
     return 0 if all_ok else 1
