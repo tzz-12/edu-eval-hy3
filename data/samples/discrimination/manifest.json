@@ -68,7 +68,7 @@
       "type": "assessment_without_followup",
       "desc": "保留评价的收集方式与判断标准，但抽掉全部后续动作（补救/反馈/拓展），闭环断开",
       "file": "data/samples/discrimination/dim8_mild.md",
-      "chars": 3164
+      "chars": 3060
     },
     {
       "case_id": "dim8_severe",
@@ -84,9 +84,9 @@
       "dim": "9",
       "level": "mild",
       "type": "fake_inquiry",
-      "desc": "启发探究改为封闭是非问+齐声应答+直接给结论；新授环节降为跟随操作、不要求说明理由",
+      "desc": "启发探究改为封闭是非问+齐声应答+直接给结论；新授降为跟随操作；并清除各环节追问、自编题、找错题等分布式探究证据",
       "file": "data/samples/discrimination/dim9_mild.md",
-      "chars": 3350
+      "chars": 3099
     },
     {
       "case_id": "dim9_severe",

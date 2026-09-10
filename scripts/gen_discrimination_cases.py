@@ -55,6 +55,18 @@ def slice_section(text: str, start: str, end: str | None) -> str:
     return text[i:j].rstrip() + "\n"
 
 
+def grab(text: str, key: str) -> str:
+    """取底稿中含 key 的**整行**，作为注入锚点。
+
+    单行级的注入（如"删掉某一条追问"）若手打锚点，极易因一个标点失配而
+    静默失败。改为按关键词从底稿取行，命中率 100%，失配则直接报错退出。
+    """
+    for ln in text.splitlines():
+        if key in ln:
+            return ln
+    raise SystemExit(f"✗ 底稿中找不到含 {key!r} 的行，注入锚点无法生成")
+
+
 # ───────────────────────────── 缺陷文本 ─────────────────────────────
 # 设计原则：mild = 「形似神不似」——格式、条目数、小标题都在，但实质缺失；
 #          severe = 该维度在全篇范围内失效。
@@ -146,6 +158,16 @@ D8_MILD_FB = [
     ("- 反馈方式：互评后统计\"默写全对人数\"，低于 70% 则下节课前 3 分钟重测，不追加新课。",
      "- 反馈方式：互评后统计\"默写全对人数\"并登记。"),
 ]
+
+# D8 mild 的另外两处补救路径：学情诊断的「三类处理」与启发环节的「调整预案」。
+# 早先版本只改了评价设计一节和各环节的反馈方式，Judge 仍稳定给 4~5 分——
+# 它引用的正是这两处：「小测结果分三类处理……安排天平演示做具象支架」
+# 与「教师调整预案：若多数学生举不出反例，则退回天平实物……」。
+# 这两条确实是基于评价结果调整教学的合法证据，判高分没错，错的是注入不彻底。
+D8_MILD_DIAG_OLD = """小测结果分三类处理：第 3 题用逆运算者，在新授环节安排"天平演示"做具象支架；第 2 题说理不清者，在性质归纳环节多给一次口头说理机会。"""
+D8_MILD_DIAG_NEW = """小测结果供教师了解全班基础，作为平时成绩参考。"""
+
+D8_MILD_ADJUST_NEW = """**教师调整预案**：按教案既定顺序推进；若学生举不出反例，教师直接给出答案后进入下一环节。"""
 
 D8_SEVERE_ASSESS = """## 四、评价设计
 
@@ -276,16 +298,30 @@ CASES = [
     ("dim8_mild", "8", "mild", "assessment_without_followup",
      "保留评价的收集方式与判断标准，但抽掉全部后续动作（补救/反馈/拓展），闭环断开",
      [("assess", D8_MILD_ASSESS)]
-     + [(None, new, old) for old, new in D8_MILD_FB]),
+     + [(None, new, old) for old, new in D8_MILD_FB]
+     + [(None, D8_MILD_DIAG_NEW, D8_MILD_DIAG_OLD),
+        (None, D8_MILD_ADJUST_NEW, D8_SEVERE_ADJUST_OLD)]),
     ("dim8_severe", "8", "severe", "no_valid_assessment",
      "评价退化为按考试分数，并抽掉各环节的反馈方式与调整预案（消灭分布式评价证据）",
      [("procedure", D8_SEVERE_PROC_FULL),
       ("assess", D8_SEVERE_ASSESS),
       (None, D8_SEVERE_ADJUST_NEW, D8_SEVERE_ADJUST_OLD)]),
     ("dim9_mild", "9", "mild", "fake_inquiry",
-     "启发探究改为封闭是非问+齐声应答+直接给结论；新授环节降为跟随操作、不要求说明理由",
+     "启发探究改为封闭是非问+齐声应答+直接给结论；新授降为跟随操作；"
+     "并清除各环节追问、自编题、找错题等分布式探究证据",
      [("inquiry", D9_MILD_INQUIRY),
-      (None, D9_MILD_PROC_NEW, D9_MILD_PROC_OLD)]),
+      (None, D9_MILD_PROC_NEW, D9_MILD_PROC_OLD),
+      ("line", "- 反馈方式：教师公布正确的列式，学生抄写在探究单上。",
+       "请 3 位写法不同的学生各说 20 秒"),
+      ("line", "- 教师支持：投影规范板书，每一步右侧标注依据（等式性质 1 / "
+               "等式性质 2 / 合并同类项），学生照板书格式书写。",
+       "针对学生中出现的"),
+      ("line", "- 学生任务：A 组（依据提示卡）完成 3 道形如 ax+b=c 的基础题，"
+               "照例题步骤仿做；B 组完成 3 道同类型提高题。",
+       "A 组（依据提示卡）完成 3 道"),
+      ("line", "- **拓展**：学有余力的学生可多做两道提高题。", "引导其自行举例检验"),
+      ("line", "对应用意识较弱的学生，额外布置两道基础题加以巩固。",
+       "对应用意识较弱的学生")]),
     ("dim9_severe", "9", "severe", "no_inquiry",
      "全篇无思考任务：启发探究改为直接讲授默写，新授改为教师演示，练习去掉自编与找错",
      [("inquiry", D9_SEVERE_INQUIRY),
@@ -314,6 +350,11 @@ def main() -> int:
                 key, new = p
                 start, end = SECTIONS[key]
                 old = slice_section(text, start, end)
+            elif p[0] == "line":                   # ("line", new, 关键词)：整行替换
+                # 注意必须放在三元组分支之前——两者长度都是 3，
+                # 顺序写反就会把关键词误当成锚点（replace 只替换关键词本身）。
+                _tag, new, key = p
+                old = grab(text, key)
             else:                                  # 精确片段替换
                 _key, new, old = p
             if old not in text:

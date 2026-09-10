@@ -220,13 +220,35 @@ class BaseJudge:
             self.cache.put(key, data)
         return data
 
+    # 结构锚点：形如  "8": {"score": 3, "evidence": "...", "ne": false}
+    # 用它从坏 JSON 中抢救分数。之所以可靠，是因为锚点落在每个维度对象的
+    # **开头**（score 紧跟维度 id），而破坏 JSON 的未转义引号都在 evidence
+    # 内部——即锚点之后。evidence 用非贪婪匹配到 `","ne"` 收尾，只要证据
+    # 正文不出现 `","ne"` 这个子串就不会错位。
+    _SCORE_ANCHOR = re.compile(
+        r'"(\d+)":\s*\{\s*"score"\s*:\s*(\d+)'
+        r'(?:\s*,\s*"evidence"\s*:\s*"(.*?)"\s*,\s*"ne")?',
+        re.S,
+    )
+
     @staticmethod
     def _parse_json(raw: str) -> Dict[str, Any]:
-        """严格解析 → 花括号抽取兜底 → 诚实失败。
+        """严格解析 → 花括号抽取 → 结构锚点抢救 → 诚实失败。
+
+        为什么要第三级
+        --------------
+        实测 deepseek-v4-flash-0731 有约 25~40% 的调用会在 evidence 中
+        输出**未转义的英文直引号**（照抄原文时把 `"买文具找零"` 原样搬进
+        JSON 字符串），导致整份 JSON 无法解析。这不是截断——finish_reason
+        仍是 stop、远未触及 max_tokens；也不是偶发网络错误。
+        系统提示里加「禁止英文直引号」的铁律后，失败率并未下降（5/8），
+        说明**不能依赖模型自律，必须在解析层兜底**。
+
+        抢救出来的结果带 `_repaired` 标记：分数可用，但需留痕以便追溯
+        哪些维度是从坏输出里恢复的。
 
         解析失败时绝不能返回空 dict：normalize 会把空 dict 兜底成
         admission=PASS / scores={}，即「模型没评上分却被当成通过」。
-        这里显式返回 NE + _parse_failed 标记，由编排层留痕告警。
         """
         try:
             data = json.loads(raw)
@@ -242,11 +264,35 @@ class BaseJudge:
                     return data
             except json.JSONDecodeError:
                 pass
+
+        rescued = BaseJudge._rescue_scores(raw)
+        if rescued:
+            return {
+                "admission": "PASS", "redline": False,
+                "scores": rescued, "suggestions": [],
+                "_repaired": True,
+                "_raw_excerpt": raw[:300],
+            }
+
         return {
             "admission": "NE", "redline": False, "scores": {},
             "suggestions": [], "_parse_failed": True,
             "_raw_excerpt": raw[:300],
         }
+
+    @classmethod
+    def _rescue_scores(cls, raw: str) -> Dict[str, Dict[str, Any]]:
+        """按结构锚点从坏 JSON 中抢救各维度分数与证据。"""
+        out: Dict[str, Dict[str, Any]] = {}
+        for dim_id, score, evidence in cls._SCORE_ANCHOR.findall(raw):
+            if dim_id in out:          # 同一维度重复出现时以首次为准
+                continue
+            out[dim_id] = {
+                "score": int(score),
+                "evidence": (evidence or "").strip(),
+                "ne": False,
+            }
+        return out
 
     @staticmethod
     def normalize(data: Dict[str, Any]) -> Dict[str, Any]:
