@@ -6,8 +6,11 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from ..config import Hy3Config
 from ..parse.parsers import ParsedDoc, parse_file
@@ -41,6 +44,12 @@ class Report:
     warnings: List[str] = field(default_factory=list)
     #: 双采样自一致统计（默认开启；--no-dual-sample 关闭时为空 dict）
     dual_sample: Dict[str, Any] = field(default_factory=dict)
+    #: 裁判元信息：这份报告由哪个模型 / 端点 / 参数产出。
+    #:
+    #: 为什么必须留痕：课题要求「全程通过 API 调用 Hy3」，而报告本身若不含
+    #: 模型名，评审无法核实、事后也无法区分换模型前后的产物——此前 3 份演示
+    #: 报告的 JSON 里搜不到任何模型信息，等于证据链断了。
+    judge: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -55,6 +64,7 @@ class Report:
             "rules": self.rules,
             "warnings": self.warnings,
             "dual_sample": self.dual_sample,
+            "judge": self.judge,
         }
 
     def to_text(self) -> str:
@@ -62,6 +72,13 @@ class Report:
         lines.append("=" * 48)
         lines.append("EduEval 评估报告（基于混元 Hy3 · 个人/活动作品）")
         lines.append("=" * 48)
+        jm = self.judge or {}
+        if jm.get("model"):
+            lines.append(
+                f"裁判模型：{jm['model']}"
+                + (f" @ {jm['endpoint_host']}" if jm.get("endpoint_host") else "")
+                + ("（mock 演示数据）" if jm.get("mock") else "")
+            )
         lines.append(f"知识准入：{self.admission}    安全红线：{'是' if self.redline else '否'}")
         if self.parse:
             lines.append(f"解析状态：{self.parse.get('parse_status')}（置信度 {self.parse.get('parse_confidence')}）")
@@ -115,6 +132,29 @@ class Report:
         return "\n".join(lines)
 
 
+def _build_judge_meta(cfg: Hy3Config, *, elapsed_s: float,
+                      dual_sample: bool, dual_threshold: int) -> Dict[str, Any]:
+    """记录产出这份报告的裁判身份与关键参数（报告自证的唯一依据）。
+
+    只写入**不含密钥**的信息：模型名、端点主机名、mock 标记与采样参数。
+    端点只留 host（如 tokenhub.tencentmaas.com），不带路径与凭据。
+    """
+    try:
+        host = urlparse(cfg.base_url or "").netloc or (cfg.base_url or "")
+    except ValueError:  # pragma: no cover - 畸形 URL 不该让评测挂掉
+        host = cfg.base_url or ""
+    return {
+        "model": cfg.model,
+        "endpoint_host": host,
+        "mock": bool(cfg.mock),
+        "dual_sample": bool(dual_sample),
+        "dual_threshold": dual_threshold,
+        "max_tokens": cfg.max_tokens,
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "elapsed_s": round(elapsed_s, 1),
+    }
+
+
 def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
              kb: Optional[KnowledgeBase] = None, denoise: bool = False,
              dual_sample: bool = True,
@@ -129,6 +169,7 @@ def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
     `denoise`：对文本类输入（.md/.txt）额外跑一遍抽取降噪。PDF 路径
     默认降噪（parsers.parse_file 内部处理）。详见 parse.layout.denoise_text。
     """
+    t0 = time.time()
     ctx = ctx or EvalContext()
     kb_loaded, gm, retriever, warns = load_kb_assets()
     if kb is not None:
@@ -142,7 +183,11 @@ def evaluate(path: str, cfg: Hy3Config, ctx: Optional[EvalContext] = None,
                         warnings=warns, dual_sample=dual_sample,
                         dual_threshold=dual_threshold)
     result = orch.run(parsed, context)
-    return _to_report(result)
+    report = _to_report(result)
+    report.judge = _build_judge_meta(cfg, elapsed_s=time.time() - t0,
+                                     dual_sample=dual_sample,
+                                     dual_threshold=dual_threshold)
+    return report
 
 
 def _to_report(result: Dict[str, Any]) -> Report:

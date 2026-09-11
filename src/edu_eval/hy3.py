@@ -6,10 +6,15 @@ API Key、Base URL、模型名仅来自环境变量（见 config.Hy3Config）。
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
+import time
 from typing import Any
 
 from .config import Hy3Config
+
+log = logging.getLogger(__name__)
 
 _SYSTEM_PREAMBLE = (
     "你是 EduEval 的教育评测裁判（Judge）。你只依据给定的量规、用户声明的教学目标与"
@@ -34,6 +39,23 @@ class QuotaExceededError(RuntimeError):
 #: 取 3 而非 1 是为了容忍真实的瞬时速率限制（per-minute），
 #: 但足以在额度耗尽时尽早止损：实测一次无效全量跑会浪费 128 次调用。
 RATE_LIMIT_ABORT_AFTER = 3
+
+#: 单次 judge 调用内部对 429 的重试次数（指数退避，单次 wait 上限见下）。
+#:
+#: 为什么要在客户端层重试，而不是只靠上层 BaseJudge.run 的「重试一次」
+#: ---------------------------------------------------------------
+#: TokenHub 上的 preview 档模型容量很小：实测 hy4-preview 首次请求约 60~75%
+#: 返回 429（code 429006「模型服务繁忙或已达服务容量上限」）。OpenAI SDK 自带的
+#: 2 次重试覆盖不了，429 会一路抛到 BaseJudge，而 BaseJudge 对 API 异常只
+#: 重试一次就把该维度降级成 NE —— 一份报告里大半维度变 NE，看起来「跑完了」
+#: 实际无效。故在客户端层把瞬时 429 消化掉。
+#:
+#: 与熔断的关系：只有**重试全部失败**的那一次才计入 _consecutive_rate_limits，
+#: 所以高容量压力不会被误判成「额度耗尽」；真正的额度耗尽（每次调用都失败）
+#: 依然会在 RATE_LIMIT_ABORT_AFTER 次后熔断止损。
+RATE_LIMIT_RETRIES = max(1, int(os.getenv("HY3_RATE_LIMIT_RETRIES") or "6"))
+#: 429 退避的单次等待上限（秒）。退避序列 1,2,4,8,10,10…
+RATE_LIMIT_BACKOFF_CAP = float(os.getenv("HY3_RATE_LIMIT_BACKOFF_CAP") or "10")
 
 
 class Hy3Client:
@@ -77,22 +99,36 @@ class Hy3Client:
         budget = max_tokens if max_tokens is not None else self.cfg.max_tokens
 
         def _call(tok: int):
-            try:
-                resp = self._client.chat.completions.create(
-                    model=self.cfg.model,
-                    messages=[
-                        {"role": "system", "content": _SYSTEM_PREAMBLE + "\n" + system},
-                        {"role": "user", "content": user},
-                    ],
-                    temperature=self.cfg.temperature if temperature is None else temperature,
-                    max_tokens=tok,
-                    response_format={"type": "json_object"},
-                )
-            except Exception as exc:
-                self._note_rate_limit(exc)  # 达阈值时抛 QuotaExceededError
-                raise
-            self._consecutive_rate_limits = 0  # 成功即清零
-            return resp
+            """带 429 指数退避的调用。仅当**重试全部失败**时才计入熔断计数。"""
+            last_exc: BaseException | None = None
+            for attempt in range(RATE_LIMIT_RETRIES):
+                try:
+                    resp = self._client.chat.completions.create(
+                        model=self.cfg.model,
+                        messages=[
+                            {"role": "system", "content": _SYSTEM_PREAMBLE + "\n" + system},
+                            {"role": "user", "content": user},
+                        ],
+                        temperature=self.cfg.temperature if temperature is None else temperature,
+                        max_tokens=tok,
+                        response_format={"type": "json_object"},
+                    )
+                except Exception as exc:
+                    last_exc = exc
+                    more = attempt < RATE_LIMIT_RETRIES - 1
+                    if getattr(exc, "status_code", None) == 429 and more:
+                        delay = min(2 ** attempt, RATE_LIMIT_BACKOFF_CAP)
+                        log.warning(
+                            "429（%s）第 %d/%d 次，%.0fs 后重试",
+                            self.cfg.model, attempt + 1, RATE_LIMIT_RETRIES, delay,
+                        )
+                        time.sleep(delay)
+                        continue
+                    self._note_rate_limit(exc)  # 达阈值时抛 QuotaExceededError
+                    raise
+                self._consecutive_rate_limits = 0  # 成功即清零
+                return resp
+            raise last_exc  # pragma: no cover — 循环内必 return 或 raise
 
         def _content(resp):
             """安全取首条 choice 的 content。

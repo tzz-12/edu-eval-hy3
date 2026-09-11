@@ -1,6 +1,6 @@
 # EduEval · 基于混元（Hy3）的初中数学教学设计质量评估器
 
-> ⚠️ **声明（务必阅读）**：本仓库为腾讯犀牛鸟开源实战「混元大语言模型」项目的**个人 / 活动作品**，**并非腾讯官方发布**，不代表腾讯公司立场。项目仅通过 API 调用混元（Hy3）提供的模型能力，**不训练、不微调任何模型，不做本地推理部署**。
+> ⚠️ **声明（务必阅读）**：本仓库为腾讯犀牛鸟开源实战「混元大语言模型」项目的**个人 / 活动作品**，**并非腾讯官方发布**，不代表腾讯公司立场。项目仅通过 API 调用**混元家族模型**的能力（课题要求的 Hy3、当前生效的裁判模型与差异说明见 §8.2），**不训练、不微调任何模型，不做本地推理部署**。
 >
 > 📮 **提交方式**：本课题产出为一个**独立应用仓库**。按活动 issue
 > [Tencent-Hunyuan/Hy3#4](https://github.com/Tencent-Hunyuan/Hy3/issues/4) 的「完成方式」，
@@ -18,7 +18,7 @@ EduEval 是一个用于评估 **AI 生成的初中数学单课时教学设计** 
 
 - **知识正确性准入优先（G0）**：先用本地知识库检索 + 程序计算 + 事实 Judge 核验概念、公式、
   适用条件与答案；任一确认错误即 `FAIL`，证据不足即 `NE`，只有 `PASS` 才进入后续评分。
-- **多 Judge 协同（均基于 Hy3）**：事实 Judge、教学设计 Judge、表达与安全 Judge 通过不同角色
+- **多 Judge 协同（均经混元模型 API）**：事实 Judge、教学设计 Judge、表达与安全 Judge 通过不同角色
   提示实现专业分工；复核 Judge 检查证据完整性，必要时触发仲裁。
 - **1 准入 + 8 加权维度 + 1 辅助维度**（权重合计 100%）：教学目标、学段适配、教—学—评一致性、
   教学环节、学情分析、学习者中心与启发探究、表述清晰度、安全合规（含红线）、格式可读性。
@@ -40,7 +40,7 @@ EduEval 是「确定性层 + Hy3 语义层」的双层结构。划分原则只�
 
 **Hy3 不负责的部分**：解析文件、查检索、算公式、算加权总分——这些走确定性代码，保证同输入同输出、可复算。
 
-> 本仓库评测结果全部由 **Hy3 API** 产生。换用其他模型端点等同于更换裁判，判别力 / 稳定性数据不可跨模型比较（配置方式见 §4）。
+> 本仓库评测结果全部经由**混元家族模型的 API** 产生。换用其他模型端点等同于更换裁判，判别力 / 稳定性数据不可跨模型比较（当前生效的裁判模型见 §8.2，配置方式见 §4）。
 
 支持格式：`.md` / `.txt` / `.docx` / `.pdf` / `.pptx`（PDF、PPTX 依赖可选依赖，缺失时友好降级）。
 
@@ -98,7 +98,7 @@ HY3_MOCK=1 python -m edu_eval data/samples/example_lesson.md
 ### 5.2 Web 应用（推荐演示方式）
 
 ```bash
-bash scripts/run_demo.sh start 8000 --live   # 真实调用 Hy3；不加 --live 走 mock，不联网不耗额度
+bash scripts/run_demo.sh start 8000 --live   # 真实调用模型 API；不加 --live 走 mock，不联网不耗额度
 bash scripts/run_demo.sh status              # 查看进程与健康状态
 bash scripts/run_demo.sh tail                # 跟踪日志
 bash scripts/run_demo.sh stop                # 停止
@@ -247,23 +247,52 @@ edu-eval-hy3/
 
 上述口径与生成方式见 `docs/kb_scope.md` §5，均可一键复算。
 
+> 标「依赖裁判模型」的两行由**开发期裁判**（`deepseek-v4-flash-0731`，vveai 端点）跑出，
+> 用于验证系统确实具备判别力与重复稳定性；**尚未在当前裁判 `hy4-preview` 上复现**——
+> 它单次调用约 200 秒，全量复现需数小时，超出本次提交窗口。复现命令见 §8.2。
+
 ### 8.2 关于裁判模型（换模型 = 换裁判）
 
-上表标「依赖裁判模型」的两行由**裁判模型**跑出，**不可跨模型沿用**。项目开发期曾在 Hy3 端点尚未
-开通时用其他 OpenAI 兼容端点作为临时裁判跑通机制与实验流程；**正式提交版本的裁判与演示报告均由
-Hy3 API 产生**。需要用 Hy3 复现这两组实验时，直接跑：
+上表标「依赖裁判模型」的两行由**裁判模型**跑出，**不可跨模型沿用**。
+
+**当前生效的裁判模型：`hy4-preview`（腾讯云 TokenHub，同属混元家族）**
+
+课题要求「全程通过 API 调用 Hy3」。TokenHub 的 `hy3` 服务在提交窗口内返回
+`HTTP 402 / code 401008`（该服务的免费体验额度已耗尽，且账号未开启后付费），
+而同一 Key 下 `hy4-preview` 可正常调用。项目因此以同属混元家族的 `hy4-preview`
+承接裁判角色：**评测提示、判分口径、代码路径完全一致，切换只差一行配置**
+（`.env` 里的 `HY3_MODEL`）。`hy3` 服务开通后付费后，把那一行改回 `hy3` 即得到严格的
+Hy3 版本，无需改动任何代码。
+
+**报告自带裁判元信息**：每份报告（`data/demo_reports/*.json`）都带 `judge` 字段，
+记录产出它的模型名、端点主机、采样参数与耗时——评审可直接核对口径，而不是只能
+采信 README 的声明：
+
+```json
+"judge": {
+  "model": "hy4-preview",
+  "endpoint_host": "tokenhub.tencentmaas.com",
+  "dual_sample": true,
+  "dual_threshold": 1,
+  "max_tokens": 16384,
+  "generated_at": "2026-09-11T14:02:11+08:00",
+  "elapsed_s": 1783.4
+}
+```
+
+需要用当前裁判复现这两组实验时，直接跑：
 
 ```bash
 export PYTHONPATH=src
-python scripts/run_discrimination.py --dims 1,4,7,8,9 --repeat 3 --out results/discrimination_hy3.json
+python scripts/run_discrimination.py --dims 1,4,7,8,9 --repeat 3 --out results/discrimination_current.json
 python scripts/run_stability.py -n 5
 ```
 
 ### 8.3 当前状态
 
 Phase 0（不依赖模型的部分：多格式解析、知识库、规则层、聚合器）与 Phase 1
-（判别力 / 一致性 / 解析健壮性三项实验）均已完成，全量测试 `282 passed, 1 skipped`。
-当前推进最后一环：演示应用、评测说明与交付文档。
+（判别力 / 一致性 / 解析健壮性三项实验）均已完成，全量测试 `297 passed, 1 skipped`。
+当前推进最后一环：演示视频、提交材料与最终交付文档。
 
 ## 9. 许可与归属
 

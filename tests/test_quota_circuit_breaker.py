@@ -38,6 +38,19 @@ def _cfg() -> Hy3Config:
                      api_key="mock", model="hy3", mock=True)
 
 
+@pytest.fixture(autouse=True)
+def _disable_rate_limit_retry(monkeypatch):
+    """本文件只考察**熔断语义**，故关闭客户端层的 429 退避重试。
+
+    2026-09-11：hy3.py 新增了针对 429 的指数退避重试（见 RATE_LIMIT_RETRIES），
+    重试会消耗掉本文件 `_client_with` 按序投放的 429，且每次退避要真 sleep，
+    测试会既变慢又失去原意。把重试次数压到 1 即恢复改动前的「一次调用一次请求」
+    语义；重试策略本身由 test_hy3_client.py 单独覆盖。
+    """
+    import edu_eval.hy3 as hy3mod
+    monkeypatch.setattr(hy3mod, "RATE_LIMIT_RETRIES", 1)
+
+
 def _choice(content, finish_reason="stop"):
     msg = SimpleNamespace(content=content)
     return SimpleNamespace(finish_reason=finish_reason, message=msg)

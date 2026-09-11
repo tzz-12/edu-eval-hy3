@@ -47,9 +47,11 @@ python scripts/pregen_demo_reports.py
 - `02_bad_formula.json` —— 注入公式错误，期望 FAIL（G0 红线）
 - `03_bad_fake_socratic.json` —— 注入伪启发包装，期望启发引导维度低分
 
-> 预生成 3 份报告在双采样模式下约消耗 80~120 次 Hy3 调用，单份耗时约 2~25 分钟。
-> 已生成的报告可重复使用，不会再次消耗额度；改了哪份就跑哪份：
-> `python scripts/pregen_demo_reports.py 01`。
+> 预生成 3 份报告在双采样模式下约消耗 80~120 次模型调用。**耗时完全取决于裁判模型**：
+> 当前裁判 `hy4-preview` 单次调用约 200 秒，单份报告约 30~40 分钟（且容量受限，需靠
+> 退避重试消化 429）；开发期用的 `deepseek-v4-flash-0731` 单份只要 3 分钟左右。
+> 建议提前起跑，或只重跑改动的那份：`python scripts/pregen_demo_reports.py 01`。
+> 已生成的报告可重复使用，不会再次消耗额度。
 
 ## 4. API 端点
 
@@ -58,7 +60,7 @@ python scripts/pregen_demo_reports.py
 | GET | `/api/health` | 不暴露 key，返回 `{ok, api_key_configured, model, base_url, db_writable, db_path, db_note, db_count}` |
 | GET | `/api/grades` | 支持的年级列表 |
 | GET | `/api/demo-samples` | 可用的演示快捷入口（自动扫 `data/demo_reports/`） |
-| POST | `/api/evaluate` | 同步评测（30-90s） |
+| POST | `/api/evaluate` | 同步评测。耗时随裁判模型差异极大：快档模型数十秒，推理档 preview 模型可达半小时 |
 | GET | `/api/reports` | 历史报告列表 |
 | GET | `/api/reports/{id}` | 单条历史报告 |
 | GET | `/api/manual` | 评测说明数据：维度口径 / 权重 / 分档阈值 / 参数，实时读 `eval/dimensions.py`（不手抄，避免文档与实现漂移）|

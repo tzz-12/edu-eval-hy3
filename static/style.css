@@ -593,6 +593,20 @@ html, body {
   font-variant-numeric: tabular-nums;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 裁判元信息徽标：让报告自证「由哪个模型产出」。提交要求全程调用 Hy3，
+   只写进 README 不够——报告本身要能出示评测口径。 */
+.report-judge {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 7px;
+  padding: 2px 9px 2px 7px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .01em;
+  color: var(--ink-dim);
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* 半环仪表盘：容器定尺寸，canvas 交给 Chart.js 自己撑满（不要用 !important 锁死，
    否则 responsive 算出来的 devicePixelRatio 缩放会失效，高分屏下会糊）。

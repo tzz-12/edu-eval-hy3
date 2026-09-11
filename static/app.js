@@ -555,6 +555,14 @@ function reportCardHTML(r, cid) {
     ? `解析 ${Math.round(r.parse.parse_confidence * 100)}%` : "";
   const metaBits = [docName, gradeName, conf].filter(Boolean);
 
+  // 裁判元信息：这份报告由哪个模型 + 端点产出。提交要求「全程通过 API 调用
+  // Hy3」，只靠 README 口头声明不够——报告本身要能出示口径，评审才能核对。
+  const jm = r.judge || {};
+  const judgeText = jm.model
+    ? `${jm.model}${jm.endpoint_host ? " @ " + jm.endpoint_host : ""}`
+      + (jm.mock ? "（mock 演示数据）" : "")
+    : "";
+
   return `
   <div class="report-card ${railCls}" data-cid="${cid}">
     <div class="report-head">
@@ -572,6 +580,7 @@ function reportCardHTML(r, cid) {
           ${agg.verdict ? `<span class="report-verdict">${escHtml(agg.verdict)}</span>` : ""}
         </div>
         <div class="report-sub">${metaBits.map(m => escHtml(m)).join(" · ")}</div>
+        ${judgeText ? `<div class="report-judge" title="本报告的裁判模型与端点：评测结论以此口径为准">⚖ ${escHtml(judgeText)}</div>` : ""}
       </div>
       <div class="gauge">
         <canvas id="gauge-${cid}"></canvas>
