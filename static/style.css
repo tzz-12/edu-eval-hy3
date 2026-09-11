@@ -295,13 +295,6 @@ html, body {
   display: flex; align-items: center; gap: var(--s2);
   min-width: 0;
 }
-.head-model {
-  font-size: 11px; color: var(--ink-faint);
-  font-family: var(--mono);
-  background: var(--subtle);
-  padding: 3px 9px; border-radius: 999px;
-  white-space: nowrap;
-  max-width: 260px; overflow: hidden; text-overflow: ellipsis; display: inline-block;
 }
 
 /* ============================ 消息流 ============================ */
@@ -762,6 +755,11 @@ html, body {
 .rpanel[data-p="overview"] .chart-grid.split > .chart-box { display: flex; flex-direction: column; }
 .rpanel[data-p="overview"] .chart-grid.split > .chart-box > .chart-canvas { flex: 1; min-height: 230px; }
 
+/* 规则层：左侧甜甜圈图 + 右侧 chip 统计，也用 stretch 让两 chart-box 等高 */
+.rpanel[data-p="rules"] .chart-grid.split { align-items: stretch; }
+.rpanel[data-p="rules"] .chart-grid.split > .chart-box { display: flex; flex-direction: column; }
+.rpanel[data-p="rules"] .chart-grid.split > .chart-box > .chip-row { flex: 1; }
+
 /* 维度速览：每维一行迷你五格条，按分值低→高排，短板顶到最上面 */
 .dim-mini { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--border); }
 .dim-mini-title {
@@ -1189,7 +1187,6 @@ input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--accent);
   .scrim.show { opacity: 1; pointer-events: auto; }
   .icon-btn { display: block; }
   /* 窄屏给模型名上限，免得把「新评测」挤没（侧栏状态行也常驻显示同一个模型） */
-  .head-model { max-width: 118px; }
   .msg { padding: 0 14px; }
   .welcome { padding: var(--s5) 14px var(--s4); }
   /* 小屏：`.composer` 已在主样式里承担左右内边距，这里收窄即可 */

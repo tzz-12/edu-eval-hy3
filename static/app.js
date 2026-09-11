@@ -134,7 +134,6 @@ function destroyCharts(prefix) {
     $("#healthBadge").innerHTML =
       `<span class="dot ${dotCls}"${dbTip ? ` title="${escHtml(dbTip)}"` : ""}></span>` +
       `<span>${label}</span>` + modelBit;
-    $("#headModel").textContent = healthInfo.model || "";
   } catch {
     $("#healthBadge").innerHTML = `<span class="dot dot-red"></span><span>后端未连接</span>`;
   }
@@ -918,8 +917,8 @@ function panelRules(r, cid) {
         <div class="chart-canvas short"><canvas id="ruledonut-${cid}"></canvas></div>
         <div class="chart-hint">规则层零 LLM：公式恒等、年级越界、结构完整性三类确定性检查。</div>
       </div>
-      <div>
-        <div class="kf-title">检查项统计</div>
+      <div class="chart-box">
+        <div class="chart-title">检查项统计</div>
         <div class="chip-row">${chipHTML}</div>
       </div>
     </div>
