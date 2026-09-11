@@ -7,6 +7,14 @@
 > 以 Pull Request 形式向活动专用分支 [`rhinobird2026`](https://github.com/Tencent-Hunyuan/Hy3/tree/rhinobird2026)
 > 提交**本项目的说明与仓库链接**——PR 只承载项目材料，**不改动 Hy3 模型仓库自身的代码**。
 
+## 演示视频
+
+![EduEval 演示](docs/demo.gif)
+
+98 秒完整走完三条评测流程：**① 好样本完整评测**（准入通过 → 总分 → 雷达图 / 维度 / 一致性）→ **② 公式错误被规则层零 LLM 拦截**（FAIL，约 0.5 秒）→ **③ 伪启发包装被判低分**（维度 9）。
+
+高清 MP4 版本（1280×832）：[`docs/demo.mp4`](./docs/demo.mp4)；分镜与字幕说明见 [`docs/demo_video.md`](./docs/demo_video.md)。
+
 ---
 
 ## 1. 项目介绍
