@@ -50,8 +50,19 @@ def main() -> int:
         cfg.mock = True
     print(f"使用模型：{cfg.model} @ {cfg.base_url}（mock={cfg.mock}）\n")
 
+    # 可按 id 前缀选择性重跑，例如 `python pregen_demo_reports.py 01`。
+    # 只改了某一份底稿时不必全量重跑（单份 live 评测约 15~25 分钟）。
+    targets = SAMPLES
+    only = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if only:
+        targets = [s for s in SAMPLES if any(s[0].startswith(o) for o in only)]
+        if not targets:
+            print(f"✗ 未匹配到样本 {only}；可用：{[s[0] for s in SAMPLES]}")
+            return 1
+        print(f"仅重跑：{[s[0] for s in targets]}\n")
+
     ok = 0
-    for sid, grade in SAMPLES:
+    for sid, grade in targets:
         src = DEMO_DIR / f"{sid}.md"
         if not src.exists():
             print(f"✗ 样本不存在：{src}")
@@ -86,8 +97,8 @@ def main() -> int:
             ok += 1
         except Exception as e:
             print(f"✗ {type(e).__name__}: {str(e)[:120]}")
-    print(f"\n完成 {ok}/{len(SAMPLES)} 份；输出：{OUT_DIR}")
-    return 0 if ok == len(SAMPLES) else 2
+    print(f"\n完成 {ok}/{len(targets)} 份；输出：{OUT_DIR}")
+    return 0 if ok == len(targets) else 2
 
 
 def admission_color(adm: str) -> str:

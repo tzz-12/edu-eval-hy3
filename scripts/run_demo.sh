@@ -56,7 +56,7 @@ cmd_start() {
     set -a; source "$ROOT/.env"; set +a
   fi
   mode="$(is_live && echo 'live' || echo 'mock')"
-  echo "启动 EduEval Demo on http://0.0.0.0:$PORT（mode=$mode，日志 $LOG）"
+  echo "启动 EduEval Demo on http://127.0.0.1:${PORT} (mode=${mode}, log=${LOG})"
   nohup /Users/tzz/.workbuddy/binaries/python/versions/3.13.12/bin/python3 \
       -m uvicorn edu_eval.api.main:fastapi_app \
       --host "${HOST:-127.0.0.1}" --port "$PORT" --log-level info \
