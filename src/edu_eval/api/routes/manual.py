@@ -12,8 +12,11 @@ Judge 分组、分档阈值、低覆盖比例、素养全集。
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from fastapi import APIRouter
 
+from ...config import Hy3Config
 from ...eval import dimensions as D
 from ...eval.aggregator import LOW_COVERAGE_RATIO, grade_label
 
@@ -52,6 +55,23 @@ def _grade_bands() -> list[dict]:
 
 
 @router.get("/api/manual")
+def _judge_info() -> dict:
+    """当前生效的裁判模型（读环境变量，不硬编码）。
+
+    裁判模型本身就是评测口径的一部分——换了模型，同一份文档的分数会变。
+    所以说明页必须跟着变，而不是把模型名写死在文档或前端里。
+    """
+    try:
+        cfg = Hy3Config.from_env(require_key=False)
+    except Exception:  # pragma: no cover - 配置残缺时说明页仍要能打开
+        return {}
+    try:
+        host = urlparse(cfg.base_url or "").netloc or (cfg.base_url or "")
+    except ValueError:  # pragma: no cover
+        host = cfg.base_url or ""
+    return {"model": cfg.model, "endpoint_host": host, "mock": bool(cfg.mock)}
+
+
 def manual() -> dict:
     dim_to_group = {d: g for g, ds in D.JUDGE_GROUPS.items() for d in ds}
 
@@ -84,4 +104,6 @@ def manual() -> dict:
         ],
         "competencies": list(D.COMPETENCIES),
         "competency_aspect": dict(D.COMPETENCY_ASPECT),
+        # 当前生效的裁判模型：属评测口径的一部分，随环境变量实时反映
+        "judge": _judge_info(),
     }

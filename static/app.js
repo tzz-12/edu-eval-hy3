@@ -1342,7 +1342,7 @@ function renderManual(m) {
         <li><b>不训练、不微调</b>：全部能力来自「规则引擎 + 分维度提示词 + 多个裁判交叉复核」，
             所以换裁判模型会改变分数（判别力与稳定性数据也不可跨模型比较）。</li>
       </ul>
-      <p>当前裁判模型：<code>${escHtml((healthInfo && healthInfo.model) || "未连接")}</code>。
+      <p>当前裁判模型：<code>${escHtml((m.judge && m.judge.model) || (healthInfo && healthInfo.model) || "未连接")}${m.judge && m.judge.endpoint_host ? " @ " + escHtml(m.judge.endpoint_host) : ""}</code>。
         本页的维度、权重与分档是<b>实时读自评测器配置</b>的，与报告的判定口径同源。</p>
     </section>
 
