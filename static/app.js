@@ -40,16 +40,16 @@ async function api(method, path, body) {
 
 // 图表配色：Chart.js 不读 CSS 变量，只能在这边维护一份，改主题时记得同步
 const C = {
-  accent: "#0d9488",
-  accentSoft: "rgba(13,148,136,0.14)",
-  good: "#047857", goodSoft: "rgba(4,120,87,0.16)",
-  warn: "#b45309", warnSoft: "rgba(180,83,9,0.16)",
-  bad:  "#be123c", badSoft:  "rgba(190,18,60,0.16)",
-  ne:   "#94a3b8", neSoft:   "rgba(148,163,184,0.18)",
-  grid: "rgba(22,32,43,0.07)",
-  label: "#5b6b7c",
-  faint: "#94a3b8",
-  tooltipBg: "#16202b",
+  accent: "#3D4A8C",
+  accentSoft: "rgba(61,74,140,0.14)",
+  good: "#2F6B4F", goodSoft: "rgba(47,107,79,0.16)",
+  warn: "#9A6B1E", warnSoft: "rgba(154,107,30,0.16)",
+  bad:  "#B23A2E", badSoft:  "rgba(178,58,46,0.16)",
+  ne:   "#8A8275", neSoft:   "rgba(138,130,117,0.18)",
+  grid: "rgba(35,32,27,0.07)",
+  label: "#6B6357",
+  faint: "#9C9486",
+  tooltipBg: "#23201B",
 };
 
 if (window.Chart) {
@@ -310,11 +310,22 @@ function addThinking(text) {
     <div class="bubble-wrap">
       <div class="thinking">
         <span class="typing-dots"><i></i><i></i><i></i></span>
-        <span>${escHtml(text)}</span>
+        <span class="thinking-text">${escHtml(text)}</span>
+        <span class="thinking-timer">0s</span>
       </div>
     </div>`;
   $("#messages").appendChild(el);
   scrollToBottom();
+
+  // 真实模型一次评测 30~90s，没有任何反馈的等待很容易让人以为卡死了。
+  // 只挂一个秒表（后端没有流式进度可依，不编造阶段），元素被移除后自停。
+  const timerEl = el.querySelector(".thinking-timer");
+  const t0 = Date.now();
+  const tick = setInterval(() => {
+    if (!document.body.contains(el)) { clearInterval(tick); return; }
+    timerEl.textContent = `${Math.round((Date.now() - t0) / 1000)}s`;
+  }, 500);
+
   return el;
 }
 
@@ -331,13 +342,27 @@ function addReportMessage(report, { animate = true } = {}) {
   $("#messages").appendChild(el);
   if (animate) el.style.animation = "fade .22s ease";
   bindReportCard(el, report, cid);
-  scrollToBottom();
+  // 报告卡常高于可视区（约 585px vs 435px），若直接滚到底部，顶部「总分 / 判定」
+  // 会被推出视口，用户第一眼看到的是中段。这里改为对齐卡片顶部。
+  requestAnimationFrame(() => {
+    scrollToEl(el, 6);
+    // 图表（环形/雷达/柱状）是异步绘制的，会改变卡片高度，再校正一次
+    setTimeout(() => scrollToEl(el, 6), 340);
+  });
   return el;
 }
 
 function scrollToBottom() {
   const m = $("#messages");
   m.scrollTop = m.scrollHeight;
+}
+
+// 把某个元素滚到消息区可视范围顶部（用 rect 差值算，不依赖 offsetParent）
+function scrollToEl(el, pad = 8) {
+  const m = $("#messages");
+  if (!m || !el) return;
+  const delta = el.getBoundingClientRect().top - m.getBoundingClientRect().top;
+  m.scrollTop = Math.max(0, m.scrollTop + delta - pad);
 }
 
 // ============== 评测提交 ==============
@@ -360,7 +385,7 @@ async function submitEvaluate() {
     meta: `${text.length.toLocaleString()} 字 · 双采样 ${$("#dualSampleCheck").checked ? "开" : "关"}`,
   });
 
-  const thinking = addThinking("正在评测（同步阻塞，真实模型约 30–90s）…");
+  const thinking = addThinking("正在评测，真实模型约 30–90 秒，请勿关闭页面…");
   $("#chatTitle").textContent = title;
   $("#chatSub").textContent = `${grade} · 评测中…`;
 
@@ -450,6 +475,9 @@ function reportCardHTML(r, cid) {
   const agg = r.aggregation || {};
   const adm = r.admission || "NE";
   const total = agg.total_score;
+  // 半圆环内的读数配色，与 drawGauge 的取色规则保持一致
+  const gv = total != null ? Number(total) : null;
+  const gaugeColor = gv == null ? C.ne : gv >= 85 ? C.good : gv >= 70 ? C.accent : gv >= 60 ? C.warn : C.bad;
   const rules = r.rules || {};
   const findings = rules.findings || [];
   const nFail = findings.filter(f => f.verdict === "fail").length;
@@ -457,39 +485,56 @@ function reportCardHTML(r, cid) {
   const ds = r.dual_sample || {};
   const scoreCount = Object.keys(r.scores || {}).length;
 
+  const railCls = adm === "FAIL" ? "is-fail" : adm === "PASS" ? "is-pass" : "is-ne";
+
+  // 元信息行：文档名 / 年级 / 解析置信度。字段名在不同来源下不一致
+  // （demo 报告用 _demo_source，实时评测用 file_name），都要兜住。
+  const docName = r.file_name || r._demo_source || "粘贴的课件文本";
+  const gradeName = r.grade || r._demo_grade || "";
+  const conf = r.parse && typeof r.parse.parse_confidence === "number"
+    ? `解析 ${Math.round(r.parse.parse_confidence * 100)}%` : "";
+  const metaBits = [docName, gradeName, conf].filter(Boolean);
+
   return `
-  <div class="report-card" data-cid="${cid}">
+  <div class="report-card ${railCls}" data-cid="${cid}">
     <div class="report-head">
       <div class="report-head-left">
         <div class="report-pill-row">
+          <span class="eyebrow">评测报告</span>
           <span class="pill pill-${escHtml(adm)}">${escHtml(adm)}</span>
           ${agg.grade ? `<span class="badge-mini badge-${adm === "FAIL" ? "fail" : "pass"}">${escHtml(agg.grade)}</span>` : ""}
-          ${agg.verdict ? `<span class="badge-mini badge-ne">${escHtml(agg.verdict)}</span>` : ""}
           ${r.redline ? `<span class="badge-mini badge-fail">红线触发</span>` : ""}
         </div>
         <div class="report-score-line">
           <span class="report-score-num">${total != null ? Number(total).toFixed(1) : "—"}</span>
           <span class="report-score-den">/ 100 加权总分</span>
+          ${agg.verdict ? `<span class="report-verdict">· ${escHtml(agg.verdict)}</span>` : ""}
         </div>
-        <div class="report-sub">
-          ${scoreCount} 个维度出分 · 有效权重覆盖 ${((agg.weight_coverage ?? 0) * 100).toFixed(0)}%
-          · 知识库命中 ${r.kb_hits ?? 0} 条
-          ${ds.dims_total ? ` · 双采样 ${ds.dims_total} 维` : ""}
-          ${findings.length ? ` · 规则层 ${findings.length} 项发现` : ""}
-        </div>
+        <div class="report-sub">${metaBits.map(m => escHtml(m)).join(" · ")}</div>
       </div>
       <div class="gauge">
         <canvas id="gauge-${cid}"></canvas>
-        <div class="gauge-num">${total != null ? Math.round(total) : "—"}</div>
+        <span class="gauge-num" style="color:${gaugeColor}">${total != null ? Math.round(Number(total)) : "—"}</span>
       </div>
     </div>
 
+    <div class="report-statbar">
+      <span><b>${scoreCount}</b> 个维度出分</span>
+      <span class="statbar-sep"></span>
+      <span>权重覆盖 <b>${((agg.weight_coverage ?? 0) * 100).toFixed(0)}%</b></span>
+      <span class="statbar-sep"></span>
+      <span>知识库命中 <b>${r.kb_hits ?? 0}</b> 条</span>
+      ${(agg.skipped_ne || []).length ? `<span class="statbar-sep"></span><span>未出分 NE <b>${agg.skipped_ne.length}</b></span>` : ""}
+      ${ds.dims_total ? `<span class="statbar-sep"></span><span>双采样 <b>${ds.dims_total}</b> 维</span>` : ""}
+      ${findings.length ? `<span class="statbar-sep"></span><span>规则层 <b>${findings.length}</b> 项发现</span>` : ""}
+    </div>
+
     <div class="report-tabs">
-      <button class="rtab active" data-p="overview">总览</button>
-      <button class="rtab" data-p="dims">维度详情 <span class="rtab-badge">${scoreCount}</span></button>
-      <button class="rtab" data-p="consistency">一致性 <span class="rtab-badge">${ds.dims_total || 0}</span></button>
-      <button class="rtab" data-p="rules">规则层 <span class="rtab-badge">${findings.length}</span></button>
-      <button class="rtab" data-p="advice">改进建议 <span class="rtab-badge">${(r.suggestions || []).length}</span></button>
+      <button class="rtab active" data-p="overview" title="结论前置：关键结论与九维雷达">总览</button>
+      <button class="rtab" data-p="dims" title="逐维评分、原文证据与判定理由">维度详情 <span class="rtab-badge">${scoreCount}</span></button>
+      <button class="rtab" data-p="consistency" title="双采样两次评分的分歧情况">一致性 <span class="rtab-badge">${ds.dims_total || 0}</span></button>
+      <button class="rtab" data-p="rules" title="零 LLM 的确定性检查发现">规则层 <span class="rtab-badge">${findings.length}</span></button>
+      <button class="rtab" data-p="advice" title="按优先级排列的改进建议">改进建议 <span class="rtab-badge">${(r.suggestions || []).length}</span></button>
     </div>
 
     <div class="report-body">
@@ -502,48 +547,81 @@ function reportCardHTML(r, cid) {
   </div>`;
 }
 
+/* ---------- 关键结论：把最重要的判断提前到第一屏 ----------
+ * 规则：① G0 闸门 FAIL 最优先 ② 规则层确定性缺陷 ③ 最低分维度 ④ 都没有则给好消息
+ * 最多 4 条，避免又变成一堵墙。 */
+function keyFindings(r) {
+  const items = [];
+  const adm = r.admission || "NE";
+  const findings = (r.rules && r.rules.findings) || [];
+
+  if (adm === "FAIL") {
+    items.push({ level: "bad", mark: "✗",
+      text: "未通过知识准入闸门（G0 · 维度2），评分已终止，不给总分" });
+  }
+
+  findings.filter(f => f.verdict === "fail").slice(0, 2).forEach(f => {
+    const ev = String(f.evidence || f.reason || "").slice(0, 88);
+    items.push({ level: "bad", mark: "✗", text: `${f.rule_id || "规则"}：${ev}` });
+  });
+
+  const low = DIM_ORDER
+    .filter(id => r.scores && r.scores[id] && !r.scores[id].ne)
+    .map(id => ({ id, s: Number(r.scores[id].score) || 0 }))
+    .filter(x => x.s <= 3)
+    .sort((a, b) => a.s - b.s)
+    .slice(0, 2);
+  low.forEach(({ id, s }) => {
+    items.push({
+      level: s <= 2 ? "bad" : "warn",
+      mark: s <= 2 ? "✗" : "△",
+      text: `维度 ${id}「${DIM_SHORT[id]}」仅 ${s}/5`,
+    });
+  });
+
+  if (!items.length) {
+    items.push({ level: "good", mark: "✓",
+      text: "未发现确定性硬伤，出分维度均在 4 分及以上" });
+  }
+  return items.slice(0, 4);
+}
+
+function keyFindingsHTML(r) {
+  return `
+  <div class="key-findings">
+    <div class="kf-title">关键结论</div>
+    ${keyFindings(r).map(it => `
+      <div class="kf-item kf-${it.level}">
+        <span class="kf-mark">${it.mark}</span>
+        <span class="kf-text">${escHtml(it.text)}</span>
+      </div>`).join("")}
+  </div>`;
+}
+
 /* ---------- 面板 1：总览 ---------- */
 function panelOverview(r, cid) {
   const agg = r.aggregation || {};
   const parse = r.parse || {};
   const adm = r.admission || "NE";
-  const skipped = agg.skipped_ne || [];
-
-  const rows = [
-    ["准入判定", adm, adm === "PASS" ? "good" : adm === "FAIL" ? "bad" : ""],
-    ["出分维度", agg.used_dimensions ?? 0, ""],
-    ["未出分 (NE)", skipped.length, skipped.length ? "warn" : ""],
-    ["有效权重", `${((agg.weight_coverage ?? 0) * 100).toFixed(0)}%`, (agg.weight_coverage ?? 0) < 0.8 ? "warn" : ""],
-    ["解析置信度", parse.parse_confidence != null ? Number(parse.parse_confidence).toFixed(2) : "—", ""],
-    ["知识库命中", r.kb_hits ?? 0, ""],
-  ];
-  const stats = rows.map(([l, v, cls]) => `
-    <div class="stat">
-      <div class="stat-label">${escHtml(l)}</div>
-      <div class="stat-value ${cls}">${escHtml(String(v))}</div>
-    </div>`).join("");
 
   const reason = adm === "FAIL"
-    ? `<div class="notice">知识红线（G0 · 维度2）未通过：${escHtml(agg.reason || r.rules?.g0_rule_verdict || "未通过知识准确性校验")}。评分已终止，其余维度不再出分。</div>`
+    ? `<div class="notice" style="margin-bottom:16px">知识红线（G0 · 维度2）未通过：${escHtml(agg.reason || r.rules?.g0_rule_verdict || "未通过知识准确性校验")}。评分已终止，其余维度不再出分。</div>`
     : "";
 
+  // 出分维度 / 权重覆盖 / KB 命中 / NE / 双采样 / 规则发现 已经在报告头下方的
+  // 统计条里常驻，这里不再重复铺一遍指标块（同一组数字出现两次就是噪音）。
   return `
   <div class="rpanel active" data-p="overview">
     ${reason}
-    <div class="chart-grid">
+    <div class="chart-grid split">
+      ${keyFindingsHTML(r)}
       <div class="chart-box">
         <div class="chart-title">九维得分雷达</div>
         <div class="chart-canvas"><canvas id="radar-${cid}"></canvas></div>
-        <div class="chart-hint">满分 5 分。NE（未出分）按 0 绘制，实际不计入加权总分。</div>
-      </div>
-      <div class="chart-box">
-        <div class="chart-title">维度得分对比</div>
-        <div class="chart-canvas"><canvas id="bar-${cid}"></canvas></div>
-        <div class="chart-hint">横条按分值分档着色：≥4 绿、3 橙、≤2 红。</div>
+        <div class="chart-hint">满分 5 分；NE 按 0 绘制且不计入加权总分。</div>
       </div>
     </div>
-    <div class="stat-grid">${stats}</div>
-    ${parse.notes ? `<div class="hint" style="margin-top:12px">解析备注：${escHtml(parse.notes)}</div>` : ""}
+    ${parse.notes ? `<div class="hint" style="margin-top:14px">解析备注：${escHtml(parse.notes)}</div>` : ""}
   </div>`;
 }
 
@@ -558,8 +636,34 @@ function panelDims(r, cid) {
     const score = ne
       ? `<span class="dim-score ne">NE</span>`
       : `<span class="dim-score score-${s.score}">${s.score}/5</span>`;
+
+    // 五格迷你条：把 3/5 与 5/5 的差别在扫视层面拉开（只读数字要停下来比）。
+    // 颜色在 JS 里按分值算，避免再维护一套 CSS 类组合。
+    const sv = Number(s.score) || 0;
+    const onColor = sv >= 4 ? "var(--good)" : sv === 3 ? "var(--warn)" : "var(--bad)";
+    const meter = (!ne && sv > 0)
+      ? `<span class="dim-meter">${[1, 2, 3, 4, 5].map(n =>
+          n <= sv ? `<i class="on" style="background:${onColor}"></i>` : `<i></i>`
+        ).join("")}</span>`
+      : "";
+
     const arb = arbitration.includes(id) ? `<span class="badge-mini badge-warn">已仲裁</span>` : "";
-    const ev = s.evidence ? `<div class="dim-evidence">${escHtml(String(s.evidence))}</div>` : "";
+
+    // 证据原文通常几百字，全量铺开会变成一堵文字墙。超阈值先折叠，
+    // 展开后完整显示（文本不截断，只是视觉收起，避免丢失判定依据）。
+    const evText = s.evidence ? String(s.evidence) : "";
+    const ev = evText ? `
+      <div class="dim-evidence${evText.length > 140 ? " folded" : ""}">
+        <div class="dim-evidence-text">${escHtml(evText)}</div>
+        ${evText.length > 140
+          ? `<button class="ev-toggle" type="button">展开证据 ▾</button>` : ""}
+      </div>` : "";
+
+    // rationale 是复核/仲裁给出的判定理由，与 evidence 原文不是一回事，分开展示
+    const rat = s.rationale
+      ? `<div class="dim-rationale"><span class="dim-rationale-tag">判定理由</span>${escHtml(String(s.rationale))}</div>`
+      : "";
+
     return `
       <div class="dim-item ${cls}">
         <div class="dim-item-head">
@@ -568,9 +672,10 @@ function panelDims(r, cid) {
             <span class="dim-name">${escHtml(DIM_NAMES[id])}</span>
             <span class="dim-priority">${DIM_PRI[id]}</span>${arb}
           </span>
-          ${score}
+          <span class="dim-tail">${meter}${score}</span>
         </div>
         ${ev}
+        ${rat}
       </div>`;
   }).join("");
 
@@ -585,8 +690,16 @@ function panelDims(r, cid) {
     </div>`;
   }
 
+  const barChart = Object.keys(r.scores || {}).length ? `
+    <div class="chart-box" style="margin-bottom:16px">
+      <div class="chart-title">维度得分对比</div>
+      <div class="chart-canvas xshort"><canvas id="bar-${cid}"></canvas></div>
+      <div class="chart-hint">横条按分值分档着色：≥4 绿、3 橙、≤2 红。</div>
+    </div>` : "";
+
   return `
   <div class="rpanel" data-p="dims">
+    ${barChart}
     ${items || emptyHint}
   </div>`;
 }
@@ -606,19 +719,16 @@ function panelConsistency(r, cid) {
   const arb = ds.arbitrated ?? 0;
   const gt1 = ds.diff_gt1 ?? 0;
 
-  const rows = [
+  const metrics = [
     ["参与维度", ds.dims_total, ""],
     ["两次完全一致", `${zero}/${paired}（${paired ? (zero / paired * 100).toFixed(0) : 0}%）`, zero === paired ? "good" : "warn"],
-    ["走平均路径", ds.avg_path ?? 0, ""],
     ["触发层内仲裁", `${arb}（${((ds.disagreement_rate ?? 0) * 100).toFixed(0)}%）`, arb ? "warn" : "good"],
-    ["分差均值", ds.diff_mean ?? 0, (ds.diff_mean ?? 0) > 1 ? "warn" : ""],
     ["分差最大", ds.diff_max ?? 0, (ds.diff_max ?? 0) > 1 ? "warn" : ""],
-    ["分差 > 阈值", gt1, gt1 ? "warn" : "good"],
   ];
-  const stats = rows.map(([l, v, cls]) => `
-    <div class="stat">
-      <div class="stat-label">${escHtml(l)}</div>
-      <div class="stat-value ${cls}">${escHtml(String(v))}</div>
+  const metricHTML = metrics.map(([l, v, cls]) => `
+    <div class="metric">
+      <span class="metric-label">${escHtml(l)}</span>
+      <span class="metric-value ${cls}">${escHtml(String(v))}</span>
     </div>`).join("");
 
   return `
@@ -635,7 +745,7 @@ function panelConsistency(r, cid) {
         <div class="chart-hint">分差 &gt; 阈值（${ds.threshold ?? 1}）即触发层内仲裁，仲裁失败则保守降级为 NE。</div>
       </div>
     </div>
-    <div class="stat-grid">${stats}</div>
+    <div class="metric-row" style="margin-top:16px">${metricHTML}</div>
   </div>`;
 }
 
@@ -652,28 +762,31 @@ function panelRules(r, cid) {
     return `<div class="rule-item ${cls}"><span class="rule-id">${escHtml(f.rule_id || "—")}</span>${sym} ${escHtml(String(ev).slice(0, 300))}</div>`;
   }).join("") : `<div class="hint">规则层无发现。</div>`;
 
+  const chips = [
+    ["G0 判定", rules.g0_rule_verdict || "—",
+      rules.g0_rule_verdict === "PASS" ? "good" : rules.g0_rule_verdict ? "bad" : ""],
+    ["公式已校验", sum.formula_checked ?? 0, ""],
+    ["公式失败", sum.formula_failed ?? 0, sum.formula_failed ? "bad" : "good"],
+    ["年级越界", sum.grade_failed ?? 0, sum.grade_failed ? "bad" : "good"],
+    ["结构缺失", sum.structure_missing ?? 0, sum.structure_missing ? "warn" : "good"],
+  ];
+  const chipHTML = chips.map(([l, v, cls]) =>
+    `<span class="chip ${cls}">${escHtml(l)} <b>${escHtml(String(v))}</b></span>`).join("");
+
   return `
   <div class="rpanel" data-p="rules">
-    <div class="chart-grid">
+    <div class="chart-grid split">
       <div class="chart-box">
         <div class="chart-title">发现按判定分布</div>
         <div class="chart-canvas short"><canvas id="ruledonut-${cid}"></canvas></div>
         <div class="chart-hint">规则层零 LLM：公式恒等、年级越界、结构完整性三类确定性检查。</div>
       </div>
-      <div class="chart-box">
-        <div class="chart-title">检查项统计</div>
-        <div class="chart-canvas short"><canvas id="rulesum-${cid}"></canvas></div>
-        <div class="chart-hint">公式「已校验 / 失败」对比，另计年级越界与结构缺失。</div>
+      <div>
+        <div class="kf-title">检查项统计</div>
+        <div class="chip-row">${chipHTML}</div>
       </div>
     </div>
-    <div class="stat-grid">
-      <div class="stat"><div class="stat-label">G0 判定</div><div class="stat-value">${escHtml(rules.g0_rule_verdict || "—")}</div></div>
-      <div class="stat"><div class="stat-label">公式已校验</div><div class="stat-value">${sum.formula_checked ?? 0}</div></div>
-      <div class="stat"><div class="stat-label">公式失败</div><div class="stat-value ${sum.formula_failed ? "bad" : "good"}">${sum.formula_failed ?? 0}</div></div>
-      <div class="stat"><div class="stat-label">年级越界</div><div class="stat-value ${sum.grade_failed ? "bad" : "good"}">${sum.grade_failed ?? 0}</div></div>
-      <div class="stat"><div class="stat-label">结构缺失</div><div class="stat-value ${sum.structure_missing ? "warn" : "good"}">${sum.structure_missing ?? 0}</div></div>
-    </div>
-    <div style="margin-top:14px">${list}</div>
+    <div style="margin-top:16px">${list}</div>
     ${(r.warnings || []).length ? `
       <div class="chart-title" style="margin-top:16px">环境告警</div>
       ${r.warnings.map(w => `<div class="rule-item rule-warn">⚠ ${escHtml(w)}</div>`).join("")}` : ""}
@@ -681,12 +794,26 @@ function panelRules(r, cid) {
 }
 
 /* ---------- 面板 5：改进建议 ---------- */
+/* 一次评测可能产出几十条建议（两位裁判各自给出，主题大量重叠），全量铺开
+   会成为整页最长的一块。默认只展示前 6 条，其余折叠，编号全局连续。 */
 function panelAdvice(r, cid) {
   const ss = r.suggestions || [];
-  const body = ss.length
-    ? `<ul class="suggest-list">${ss.map(s => `<li>${escHtml(s)}</li>`).join("")}</ul>`
-    : `<div class="hint">本次没有生成改进建议。</div>`;
-  return `<div class="rpanel" data-p="advice">${body}</div>`;
+  if (!ss.length) {
+    return `<div class="rpanel" data-p="advice"><div class="hint">本次没有生成改进建议。</div></div>`;
+  }
+  const LIMIT = 6;
+  const rest = ss.length - LIMIT;
+  return `
+  <div class="rpanel" data-p="advice">
+    <ol class="suggest-list">
+      ${ss.slice(0, LIMIT).map(s => `<li>${escHtml(s)}</li>`).join("")}
+    </ol>
+    ${rest > 0 ? `
+      <ol class="suggest-list suggest-more hidden">
+        ${ss.slice(LIMIT).map(s => `<li>${escHtml(s)}</li>`).join("")}
+      </ol>
+      <button class="suggest-toggle" type="button">展开其余 ${rest} 条建议 ▾</button>` : ""}
+  </div>`;
 }
 
 /* ================================================================
@@ -694,10 +821,34 @@ function panelAdvice(r, cid) {
  * ================================================================ */
 
 function bindReportCard(el, r, cid) {
-  // 总览面板默认可见，先画
+  // 总览面板默认可见，先画它里面的图（维度条形图随 dims Tab 懒加载）
   drawGauge(r, cid);
   drawRadar(r, cid);
-  drawDimBar(r, cid);
+
+  // 折叠类交互统一走事件委托：维度证据展开、改进建议展开
+  // （报告卡内容全是动态生成的，逐个绑定既啰嗦又易漏）
+  el.addEventListener("click", (e) => {
+    const evBtn = e.target.closest(".ev-toggle");
+    if (evBtn) {
+      const box = evBtn.closest(".dim-evidence");
+      if (box) {
+        const nowFolded = box.classList.toggle("folded");
+        evBtn.textContent = nowFolded ? "展开证据 ▾" : "收起证据 ▴";
+      }
+      return;
+    }
+    const sgBtn = e.target.closest(".suggest-toggle");
+    if (sgBtn) {
+      const panel = sgBtn.closest(".rpanel");
+      const more = panel && panel.querySelector(".suggest-more");
+      if (more) {
+        const nowHidden = more.classList.toggle("hidden");
+        sgBtn.textContent = nowHidden
+          ? `展开其余 ${more.children.length} 条建议 ▾`
+          : "收起建议 ▴";
+      }
+    }
+  });
 
   el.querySelectorAll(".rtab").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -710,13 +861,14 @@ function bindReportCard(el, r, cid) {
 }
 
 function ensurePanelCharts(r, cid, panel) {
+  if (panel === "dims") { drawDimBar(r, cid); }
   if (panel === "consistency") { drawConsistency(r, cid); }
   if (panel === "rules") { drawRules(r, cid); }
 }
 
 function drawGauge(r, cid) {
   const el = document.getElementById(`gauge-${cid}`);
-  if (!el || !window.Chart) return;
+  if (!el || !window.Chart || charts.has(`gauge-${cid}`)) return;
   const total = r.aggregation?.total_score;
   const v = total != null ? Math.max(0, Math.min(100, Number(total))) : 0;
   const color = v >= 85 ? C.good : v >= 70 ? C.accent : v >= 60 ? C.warn : C.bad;
@@ -743,7 +895,7 @@ function drawGauge(r, cid) {
 
 function drawRadar(r, cid) {
   const el = document.getElementById(`radar-${cid}`);
-  if (!el || !window.Chart) return;
+  if (!el || !window.Chart || charts.has(`radar-${cid}`)) return;
   const scores = r.scores || {};
   const labels = DIM_ORDER.map(id => `${id} ${DIM_SHORT[id]}`);
   const data = DIM_ORDER.map(id => {
@@ -791,7 +943,8 @@ function drawRadar(r, cid) {
 
 function drawDimBar(r, cid) {
   const el = document.getElementById(`bar-${cid}`);
-  if (!el || !window.Chart) return;
+  // 画布随 Tab 懒加载，反复切换不能重复创建实例（否则 Canvas is already in use）
+  if (!el || !window.Chart || charts.has(`bar-${cid}`)) return;
   const scores = r.scores || {};
   const ids = DIM_ORDER.filter(id => scores[id]);
   const labels = ids.map(id => `${id} ${DIM_SHORT[id]}`);

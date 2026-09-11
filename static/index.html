@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EduEval · AI 生成 K-12 课件质量评测</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Chart.js：总分仪表盘 / 九维雷达 / 维度条形 / 一致性环形 / 规则分布 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Chart.js 本地副本：避免 CDN 不可达时图表空白（脚本缺失会让整页 JS 中断） -->
+  <script src="chart.umd.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -57,6 +57,24 @@
             <h2>把课件交给 EduEval 评一评</h2>
             <p>粘贴一份 AI 生成的教案或课件，系统会从 9 个维度给出评分，
                用规则层零成本拦截知识性硬伤，并用双采样自一致压住 LLM 打分的随机性。</p>
+
+            <div class="welcome-feats">
+              <div class="feat">
+                <span class="feat-k">01</span>
+                <b>规则层先行</b>
+                <span class="feat-desc">公式恒等、年级越界、结构完整性三类确定性问题零 LLM 校验，硬伤直接拦截</span>
+              </div>
+              <div class="feat">
+                <span class="feat-k">02</span>
+                <b>九维加权评分</b>
+                <span class="feat-desc">教学目标、学段适配、教-学-评一致性等逐维打分，每条结论都附原文证据</span>
+              </div>
+              <div class="feat">
+                <span class="feat-k">03</span>
+                <b>双采样自一致</b>
+                <span class="feat-desc">同一裁判用两个视角各评一次，分歧超过阈值转仲裁，压住单次采样抖动</span>
+              </div>
+            </div>
 
             <div class="welcome-demo">
               <div class="welcome-demo-title">或直接从演示样本开始</div>
