@@ -10,7 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .routes import evaluate_router, health_router, history_router, manual_router
+from .routes import (evaluate_router, health_router, history_router,
+                     manual_router, source_router)
 from .storage import init_db
 
 # src/edu_eval/api/app.py -> ../../../static
@@ -46,6 +47,7 @@ fastapi_app.include_router(health_router)
 fastapi_app.include_router(evaluate_router)
 fastapi_app.include_router(history_router)
 fastapi_app.include_router(manual_router)
+fastapi_app.include_router(source_router)
 
 
 # 静态前端（挂到根路径；必须放最后，否则会覆盖 /api/*）

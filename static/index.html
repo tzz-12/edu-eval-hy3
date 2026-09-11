@@ -183,6 +183,32 @@
   </div>
 
   <div class="scrim" id="scrim"></div>
+
+  <!-- ============ 源文件预览抽屉（右侧滑入） ============ -->
+  <aside class="source-pane" id="sourcePane" aria-hidden="true" role="complementary"
+         aria-label="评测源文件预览">
+    <header class="source-head">
+      <div class="source-head-text">
+        <h3 id="sourceTitle">源文件</h3>
+        <p id="sourceMeta" class="source-meta"></p>
+      </div>
+      <div class="source-tools">
+        <input type="search" id="sourceSearch" class="source-search"
+               placeholder="在源文件中搜索…" aria-label="搜索源文件">
+        <button id="sourceSearchPrev" class="source-tool-btn" title="上一个匹配" aria-label="上一个匹配">↑</button>
+        <button id="sourceSearchNext" class="source-tool-btn" title="下一个匹配" aria-label="下一个匹配">↓</button>
+        <span id="sourceMatchCount" class="source-match-count" aria-live="polite"></span>
+        <button id="sourceClose" class="source-close" title="关闭" aria-label="关闭">✕</button>
+      </div>
+    </header>
+    <div class="source-body" id="sourceBody" tabindex="0">
+      <div class="source-empty" id="sourceEmpty">暂无源文件</div>
+    </div>
+    <footer class="source-foot">
+      <span id="sourceFootHint" class="source-foot-hint">点击报告中的「原文证据」可定位到源文件对应片段</span>
+    </footer>
+  </aside>
+
   <script src="app.js"></script>
 </body>
 </html>

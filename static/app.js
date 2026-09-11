@@ -579,7 +579,16 @@ function reportCardHTML(r, cid) {
           <span class="report-score-label">加权总分</span>
           ${agg.verdict ? `<span class="report-verdict">${escHtml(agg.verdict)}</span>` : ""}
         </div>
-        <div class="report-sub">${metaBits.map(m => escHtml(m)).join(" · ")}</div>
+        <div class="report-sub">
+          <span class="report-sub-text">${metaBits.map(m => escHtml(m)).join(" · ")}</span>
+          <button type="button" class="report-source-btn" data-act="open-source" title="在侧栏打开原始课件文本，与证据对照阅读">
+            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+              <path d="M14 3h-4v2h4V3zm-6 0H6v2h2V3zm12 0v2h-2V3h2zM3 7h18v13H3V7zm2 2v9h14V9H5z"
+                    fill="currentColor"></path>
+            </svg>
+            查看源文件
+          </button>
+        </div>
         ${judgeText ? `<div class="report-judge" title="本报告的裁判模型与端点：评测结论以此口径为准">⚖ ${escHtml(judgeText)}</div>` : ""}
       </div>
       <div class="gauge">
@@ -757,10 +766,21 @@ function panelDims(r, cid) {
 
     // 证据原文通常几百字，全量铺开会变成一堵文字墙。超阈值先折叠，
     // 展开后完整显示（文本不截断，只是视觉收起，避免丢失判定依据）。
+    // 数据 evidence 嵌入 data-* 属性：从 dataset 读回来浏览器自动 unescape（与 escHtml 配套）。
     const evText = s.evidence ? String(s.evidence) : "";
     const ev = evText ? `
       <div class="dim-evidence${evText.length > 140 ? " folded" : ""}">
-        <div class="dim-evidence-text">${escHtml(evText)}</div>
+        <div class="dim-evidence-text evidence-anchor" data-evidence="${escHtml(evText)}"
+             role="button" tabindex="0" title="点击在源文件中定位该证据">
+          ${escHtml(evText)}
+        </div>
+        <button type="button" class="evidence-jump" data-act="jump" title="在源文件中定位">
+          <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
+            <path d="M12 2a7 7 0 0 0-7 7c0 4.25 6.43 11.66 6.72 11.95a1 1 0 0 0 1.28 0C13.57 20.66 19 13.25 19 9a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"
+                  fill="currentColor"></path>
+          </svg>
+          定位到源文件
+        </button>
         ${evText.length > 140
           ? `<button class="ev-toggle" type="button">展开证据 ▾</button>` : ""}
       </div>` : "";
@@ -934,6 +954,9 @@ function bindReportCard(el, r, cid) {
   // 折叠类交互统一走事件委托：维度证据展开、改进建议展开
   // （报告卡内容全是动态生成的，逐个绑定既啰嗦又易漏）
   el.addEventListener("click", (e) => {
+    const srcBtn = e.target.closest(".report-source-btn");
+    if (srcBtn) { openSource(r); return; }
+
     const evBtn = e.target.closest(".ev-toggle");
     if (evBtn) {
       const box = evBtn.closest(".dim-evidence");
@@ -943,6 +966,17 @@ function bindReportCard(el, r, cid) {
       }
       return;
     }
+
+    // 证据跳转：点击证据文本或「定位到源文件」按钮，都跳到源文件对应片段
+    const evAnch = e.target.closest(".evidence-anchor, .evidence-jump");
+    if (evAnch) {
+      const box = evAnch.closest(".dim-evidence");
+      const txt = box && box.querySelector(".evidence-anchor");
+      const evidence = txt && txt.dataset.evidence;
+      if (evidence) openSource(r, { evidence });
+      return;
+    }
+
     const sgBtn = e.target.closest(".suggest-toggle");
     if (sgBtn) {
       const panel = sgBtn.closest(".rpanel");
@@ -954,6 +988,18 @@ function bindReportCard(el, r, cid) {
           : "收起建议 ▴";
       }
     }
+  });
+
+  // 证据文本支持键盘 Enter / Space 触发定位
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const evAnch = e.target.closest && e.target.closest(".evidence-anchor");
+    if (!evAnch) return;
+    e.preventDefault();
+    const box = evAnch.closest(".dim-evidence");
+    const txt = box && box.querySelector(".evidence-anchor");
+    const evidence = txt && txt.dataset.evidence;
+    if (evidence) openSource(r, { evidence });
   });
 
   el.querySelectorAll(".rtab").forEach(btn => {
@@ -1563,3 +1609,427 @@ function closeManual() {
   el.classList.remove("show");
   el.setAttribute("aria-hidden", "true");
 }
+
+/* ============ 源文件预览抽屉 ============
+ * 设计取舍：
+ * - demo 报告：后端按 _demo_source 读 data/samples/demo/<id>.md
+ * - live 报告：评测时 source_text 已落 DB，按 report_id 拉
+ * - 解析失败 / 找不到源：抽屉能打开但 body 显示降级提示，保留「源文件不可用」真相
+ * - Markdown 渲染是手写的极简版：评测底稿常用结构就是这几种，
+ *   引入第三方（如 marked.js）收益低且要再带一份脚本。安全转义在 escHtml 里做。
+ */
+
+// === 极简 Markdown 渲染器（够用为先） ===========================
+function renderMarkdown(md) {
+  if (!md) return "";
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  let inCode = false;
+  let codeBuf = [];
+  let inList = null; // "ul" | "ol"
+
+  const inline = (s) => {
+    // 行内：行内代码 > 加粗 > 斜体 > 文本转义
+    let t = escHtml(s);
+    t = t.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`);
+    t = t.replace(/\*\*([^*]+)\*\*/g, (_, c) => `<strong>${c}</strong>`);
+    t = t.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, (_, c) => `<em>${c}</em>`);
+    return t;
+  };
+  const flushList = () => {
+    if (!inList) return;
+    out.push(`</${inList}>`);
+    inList = null;
+  };
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // 代码块
+    if (/^```/.test(line)) {
+      flushList();
+      if (!inCode) {
+        inCode = true;
+        codeBuf = [];
+        i += 1;
+        continue;
+      } else {
+        out.push(`<pre>${escHtml(codeBuf.join("\n"))}</pre>`);
+        inCode = false;
+        i += 1;
+        continue;
+      }
+    }
+    if (inCode) {
+      codeBuf.push(line);
+      i += 1;
+      continue;
+    }
+
+    // 标题
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) {
+      flushList();
+      const level = h[1].length;
+      out.push(`<h${level}>${inline(h[2])}</h${level}>`);
+      i += 1;
+      continue;
+    }
+
+    // 水平线
+    if (/^\s*---+\s*$/.test(line)) {
+      flushList();
+      out.push("<hr>");
+      i += 1;
+      continue;
+    }
+
+    // 引用
+    if (/^\s*>\s?/.test(line)) {
+      flushList();
+      const quoteLines = [];
+      while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+        quoteLines.push(lines[i].replace(/^\s*>\s?/, ""));
+        i += 1;
+      }
+      out.push(`<blockquote>${quoteLines.map(inline).join("<br>")}</blockquote>`);
+      continue;
+    }
+
+    // 无序列表
+    if (/^[\s]*[-*]\s+/.test(line)) {
+      if (inList !== "ul") { flushList(); out.push("<ul>"); inList = "ul"; }
+      out.push(`<li>${inline(line.replace(/^[\s]*[-*]\s+/, ""))}</li>`);
+      i += 1;
+      continue;
+    }
+
+    // 有序列表
+    if (/^[\s]*\d+\.\s+/.test(line)) {
+      if (inList !== "ol") { flushList(); out.push("<ol>"); inList = "ol"; }
+      out.push(`<li>${inline(line.replace(/^[\s]*\d+\.\s+/, ""))}</li>`);
+      i += 1;
+      continue;
+    }
+
+    // 空行
+    if (/^\s*$/.test(line)) {
+      flushList();
+      i += 1;
+      continue;
+    }
+
+    // 段落：把后续连续非空行拼起来
+    flushList();
+    const para = [line];
+    i += 1;
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|```|>\s?|[-*]\s|\d+\.\s|---)/.test(lines[i])) {
+      para.push(lines[i]);
+      i += 1;
+    }
+    out.push(`<p>${para.map(inline).join("<br>")}</p>`);
+  }
+
+  flushList();
+  if (inCode) out.push(`<pre>${escHtml(codeBuf.join("\n"))}</pre>`);
+  return out.join("\n");
+}
+
+// === 搜索：TreeWalker 走文本节点，避免破坏已渲染的标签 =================
+let sourceSearchState = { needle: "", hits: [], cursor: -1 };
+
+function clearHighlights() {
+  $$("#sourceBody .hl").forEach((n) => {
+    const parent = n.parentNode;
+    if (!parent) return;
+    parent.replaceChild(document.createTextNode(n.textContent), n);
+    parent.normalize();
+  });
+}
+
+function highlightAll(needle) {
+  clearHighlights();
+  sourceSearchState = { needle, hits: [], cursor: -1 };
+  $("#sourceMatchCount").textContent = "";
+  if (!needle) return;
+  const lower = needle.toLowerCase();
+  const walker = document.createTreeWalker($("#sourceBody"), NodeFilter.SHOW_TEXT, null);
+  const textNodes = [];
+  let n;
+  while ((n = walker.nextNode())) textNodes.push(n);
+
+  // 反向遍历，offset 不被前置插入打乱
+  for (let i = textNodes.length - 1; i >= 0; i -= 1) {
+    const node = textNodes[i];
+    const txt = node.textValue || node.textContent || "";
+    const lt = txt.toLowerCase();
+    if (!lt.includes(lower)) continue;
+    const frag = document.createDocumentFragment();
+    let pos = 0;
+    let idx;
+    while ((idx = lt.indexOf(lower, pos)) !== -1) {
+      if (idx > pos) frag.appendChild(document.createTextNode(txt.slice(pos, idx)));
+      const span = document.createElement("span");
+      span.className = "hl";
+      span.textContent = txt.slice(idx, idx + needle.length);
+      frag.appendChild(span);
+      pos = idx + needle.length;
+      sourceSearchState.hits.unshift(span);
+    }
+    if (pos < txt.length) frag.appendChild(document.createTextNode(txt.slice(pos)));
+    node.parentNode.replaceChild(frag, node);
+  }
+
+  if (sourceSearchState.hits.length) {
+    sourceSearchState.cursor = 0;
+    updateMatchCount();
+    focusCurrentHit(false);
+  } else {
+    $("#sourceMatchCount").textContent = "0";
+  }
+}
+
+function updateMatchCount() {
+  const total = sourceSearchState.hits.length;
+  const cur = sourceSearchState.cursor + 1;
+  $("#sourceMatchCount").textContent = total ? `${cur}/${total}` : "";
+  $("#sourceSearchPrev").disabled = total < 2;
+  $("#sourceSearchNext").disabled = total < 2;
+}
+
+function focusCurrentHit(scroll = true) {
+  sourceSearchState.hits.forEach((h, i) => h.classList.toggle("current", i === sourceSearchState.cursor));
+  const hit = sourceSearchState.hits[sourceSearchState.cursor];
+  if (hit && scroll) {
+    hit.scrollIntoView({ behavior: "smooth", block: "center" });
+    updateMatchCount();
+  }
+}
+
+function moveHit(delta) {
+  if (!sourceSearchState.hits.length) return;
+  sourceSearchState.cursor =
+    (sourceSearchState.cursor + delta + sourceSearchState.hits.length) % sourceSearchState.hits.length;
+  focusCurrentHit(true);
+}
+
+// === 证据溯源：按证据文本去源里找对应片段 ===========================
+// 证据里常带「...」「引号」「省略」「……」等编辑痕迹——按标点切段，从长到短找命中片段。
+function locateEvidenceInSource(evidenceText) {
+  if (!evidenceText) return null;
+  const body = $("#sourceBody");
+  if (!body) return null;
+
+  // 规范化：去两端空白与首尾标点
+  const clean = String(evidenceText)
+    .trim()
+    .replace(/^[\s"""''「」、，。,.\-—–]+|[\s"""''「」、，。,.\-—–]+$/g, "");
+
+  if (!clean) return null;
+  const candidates = [];
+  // 1) 整段
+  candidates.push(clean);
+  // 2) 去首尾引号
+  const noQuote = clean.replace(/["""''「」『』]/g, "");
+  if (noQuote && noQuote !== clean) candidates.push(noQuote);
+  // 3) 按句末标点切：。 ； ？ ！ ， / . ; ? ! , ； 一是「……」 等
+  const splits = clean.split(/[。；！？\.!?；，,]/).map((s) => s.trim()).filter((s) => s.length >= 8);
+  splits.forEach((s) => candidates.push(s));
+  // 4) 从长到短
+  candidates.sort((a, b) => b.length - a.length);
+
+  // 用全文本检索
+  const bodyText = body.textContent || "";
+  for (const cand of candidates) {
+    if (cand.length < 6) continue;
+    const idx = bodyText.indexOf(cand);
+    if (idx >= 0) {
+      // 在 hits 序列里找最靠前含 cand 文本的元素
+      const allSpans = $$("#sourceBody span.hl, #sourceBody .evidence-target");
+      for (const span of allSpans) {
+        if (span.textContent && span.textContent.includes(cand.slice(0, 8))) return span;
+      }
+      // 否则返回 null 让调用方退回到文本高亮
+      return { cand };
+    }
+  }
+  return null;
+}
+
+function scrollAndMarkEvidence(evidenceText) {
+  const body = $("#sourceBody");
+  body.querySelectorAll(".evidence-target").forEach((n) => n.classList.remove("evidence-target"));
+
+  const hit = locateEvidenceInSource(evidenceText);
+  if (hit && hit instanceof HTMLElement) {
+    hit.classList.add("evidence-target");
+    hit.scrollIntoView({ behavior: "smooth", block: "center" });
+    return true;
+  }
+  // 降级：临时构造高亮再滚
+  if (hit && hit.cand) {
+    const cand = hit.cand;
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    let n;
+    while ((n = walker.nextNode())) textNodes.push(n);
+    for (let i = textNodes.length - 1; i >= 0; i -= 1) {
+      const node = textNodes[i];
+      const txt = node.textContent || "";
+      const idx = txt.indexOf(cand);
+      if (idx < 0) continue;
+      const before = txt.slice(0, idx);
+      const mid = document.createElement("span");
+      mid.className = "evidence-target hl";
+      mid.textContent = cand;
+      const after = txt.slice(idx + cand.length);
+      const frag = document.createDocumentFragment();
+      if (before) frag.appendChild(document.createTextNode(before));
+      frag.appendChild(mid);
+      if (after) frag.appendChild(document.createTextNode(after));
+      node.parentNode.replaceChild(frag, node);
+      mid.scrollIntoView({ behavior: "smooth", block: "center" });
+      // 5 秒后清除临时高亮
+      setTimeout(() => {
+        mid.replaceWith(document.createTextNode(mid.textContent));
+      }, 5000);
+      return true;
+    }
+  }
+  // 找不到就滚到顶部并提示
+  body.scrollTo({ top: 0, behavior: "smooth" });
+  $("#sourceFootHint").textContent = "未在源文件中找到完全匹配的片段（证据可能含省略或编辑痕迹）";
+  setTimeout(() => {
+    $("#sourceFootHint").textContent = "点击报告中的「原文证据」可定位到源文件对应片段";
+  }, 4000);
+  return false;
+}
+
+// === 抽屉打开 / 关闭 / 数据加载 ======================================
+let sourceReq = null;
+let sourceOpenReportId = null;  // 记录当前打开的是哪条报告（判定 evidence 是否能跳）
+
+async function openSource(report, opts) {
+  // 入参归一：opts 可能省略，report 可能是报告对象或 cid
+  const ev = opts && opts.evidence ? String(opts.evidence) : null;
+  const targetReportId = (report && report._id) || null;
+  sourceOpenReportId = targetReportId;
+
+  // demo 报告的 _id 可能是 null：把 _demo_source 作为后端可识别的 id 补上
+  const isDemo = !!(report && report._demo_source);
+  // _demo_source 是「带后缀的文件名」（如 01_good_二次函数.md），后端接收的是 id 不是文件名
+  const demoId = isDemo ? String(report._demo_source).replace(/\.md$/i, "") : null;
+
+  const params = new URLSearchParams();
+  if (demoId) params.set("demo_id", demoId);
+  if (targetReportId) params.set("report_id", String(targetReportId));
+
+  const pane = $("#sourcePane");
+  const body = $("#sourceBody");
+  const title = $("#sourceTitle");
+  const meta = $("#sourceMeta");
+  const empty = $("#sourceEmpty");
+
+  // 复位状态（注意：empty 是 body 的子节点，所以必须**先**操作 empty，再 body.innerHTML = ""）
+  sourceSearchState = { needle: "", hits: [], cursor: -1 };
+  $("#sourceSearch").value = "";
+  $("#sourceMatchCount").textContent = "";
+  if (empty) {
+    empty.style.display = "block";
+    empty.textContent = "加载中…";
+  }
+  body.innerHTML = "";
+  pane.classList.add("show");
+  pane.setAttribute("aria-hidden", "false");
+  document.body.classList.add("source-open");
+  // 等 CSS 动画走半程再聚焦，避免首屏闪白
+  setTimeout(() => body.focus({ preventScroll: true }), 200);
+
+  const label =
+    (report && (report.file_name || report._demo_source)) || "源文件预览";
+  title.textContent = label;
+  meta.textContent = "加载中…";
+
+  try {
+    if (sourceReq && sourceReq.controller) sourceReq.controller.abort();
+    const controller = new AbortController();
+    sourceReq = { controller };
+    const resp = await fetch("/api/source?" + params.toString(), { signal: controller.signal });
+    sourceReq = null;
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    // empty 是 body 的子节点，body.innerHTML = "" 会把它一起干掉；用 replaceChildren 保住 empty
+    if (empty) {
+      body.replaceChildren(empty);
+    } else {
+      body.innerHTML = "";
+    }
+    if (!data.content) {
+      empty.textContent = data.reason || "源文件不可用";
+      empty.style.display = "block";
+      meta.textContent = data.source_kind ? `kind: ${data.source_kind}` : "";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+    const html = renderMarkdown(data.content);
+    const wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    body.appendChild(wrap);
+    meta.textContent =
+      `kind: ${data.source_kind}` +
+      (typeof data.length === "number" ? ` · ${data.length.toLocaleString()} 字` : "");
+    $("#sourceFootHint").textContent = "点击报告中的「原文证据」可定位到源文件对应片段";
+
+    if (ev) {
+      // 给 DOM 一帧让出，再定位
+      setTimeout(() => scrollAndMarkEvidence(ev), 60);
+    } else {
+      body.scrollTo({ top: 0 });
+    }
+  } catch (e) {
+    if (e.name === "AbortError") return;
+    if (empty) {
+      body.replaceChildren(empty);
+      empty.style.display = "block";
+      empty.textContent = "源文件加载失败：" + (e.message || e);
+    } else {
+      body.textContent = "源文件加载失败：" + (e.message || e);
+    }
+    meta.textContent = "";
+  }
+}
+
+function closeSource() {
+  const pane = $("#sourcePane");
+  pane.classList.remove("show");
+  pane.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("source-open");
+  clearHighlights();
+  sourceOpenReportId = null;
+  if (sourceReq && sourceReq.controller) sourceReq.controller.abort();
+  sourceReq = null;
+}
+
+// === 事件绑定：抽屉打开按钮、关闭按钮、搜索、键盘 =====================
+function bindSourceEvents() {
+  $("#sourceClose").addEventListener("click", closeSource);
+  $("#sourceSearch").addEventListener("input", (e) => {
+    const v = e.target.value.trim();
+    highlightAll(v);
+  });
+  $("#sourceSearchPrev").addEventListener("click", () => moveHit(-1));
+  $("#sourceSearchNext").addEventListener("click", () => moveHit(+1));
+  document.addEventListener("keydown", (e) => {
+    if (!$("#sourcePane").classList.contains("show")) return;
+    if (e.key === "Escape") { e.preventDefault(); closeSource(); }
+    if (e.key === "Enter" && document.activeElement === $("#sourceSearch")) {
+      e.preventDefault();
+      moveHit(e.shiftKey ? -1 : +1);
+    }
+  });
+}
+bindSourceEvents();

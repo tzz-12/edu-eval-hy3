@@ -102,6 +102,9 @@ def evaluate(req: EvaluateRequest) -> Dict[str, Any]:
             file_name=_derive_name(req.file_name, req.text or ""),
             grade=req.grade,
             dual_sample=req.dual_sample,
+            # 源文本一起存下来，前端才能「点开看原文」核对每条证据。
+            # 存的是送入评测的那份文本（不是原始文件二进制），正文即评测输入。
+            source_text=req.text or "",
         )
         payload["_id"] = rid
     except Exception as e:

@@ -82,10 +82,15 @@ CREATE TABLE IF NOT EXISTS reports (
     admission TEXT,
     dual_sample INTEGER NOT NULL,
     total_score REAL,
+    source_text TEXT,
     payload TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at DESC);
 """
+
+#: 源文本入库上限（字符）。报告要能「点开看原文」，但正文可能是几十页 PDF 抽取物，
+#: 全量塞进 DB 会让历史列表的 payload 拖得又大又慢。超出部分截断并留痕。
+MAX_SOURCE_CHARS = 400_000
 
 
 @contextmanager
@@ -103,14 +108,27 @@ def _conn() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _migrate(c: sqlite3.Connection) -> None:
+    """轻量迁移：给已存在的旧表补新列。
+
+    `CREATE TABLE IF NOT EXISTS` 对老库什么都不做，所以新增列必须显式补——
+    否则老库上带 source_text 的 INSERT 会直接 `no such column` 报错。
+    用 PRAGMA table_info 判存在性，ADD COLUMN 本身可重复执行。
+    """
+    cols = {row[1] for row in c.execute("PRAGMA table_info(reports)").fetchall()}
+    if "source_text" not in cols:
+        c.execute("ALTER TABLE reports ADD COLUMN source_text TEXT")
+
+
 def init_db() -> None:
-    """进程启动时调用一次：建表 + 建索引。失败只记 warning，不阻断启动。"""
+    """进程启动时调用一次：建表 + 建索引 + 补列。失败只记 warning，不阻断启动。"""
     if not DB_WRITABLE:
         return
     with _lock:
         try:
             with _conn() as c:
                 c.executescript(_SCHEMA)
+                _migrate(c)
                 c.commit()
         except sqlite3.Error as exc:
             print(f"[storage] 建表失败（历史功能不可用）：{exc}")
@@ -127,24 +145,33 @@ def db_status() -> Dict[str, Any]:
 
 
 def add_report(payload: Dict[str, Any], *, file_name: str = "",
-               grade: str = "", dual_sample: bool = True) -> Optional[int]:
-    """写入一条报告，返回 id；失败返回 None（调用方降级，不影响主流程）。"""
+               grade: str = "", dual_sample: bool = True,
+               source_text: str = "") -> Optional[int]:
+    """写入一条报告，返回 id；失败返回 None（调用方降级，不影响主流程）。
+
+    source_text 是**被评测的那份课件正文**，单独成一列而不是塞进 payload：
+    报告详情在历史列表里会被反复读取，正文可达数百 KB，挂在 payload 上等于
+    每次列表都拖着正文跑。它只在「查看源文件」时按需取。
+    """
     if not DB_WRITABLE:
         return None
     total = (payload.get("aggregation") or {}).get("total_score")
     if isinstance(total, bool) or not isinstance(total, (int, float)):
         total = None
+    src = (source_text or "")[:MAX_SOURCE_CHARS]
     with _lock:
         try:
             with _conn() as c:
                 cur = c.execute(
                     """INSERT INTO reports
-                       (created_at, file_name, grade, admission, dual_sample, total_score, payload)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       (created_at, file_name, grade, admission, dual_sample,
+                        total_score, source_text, payload)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (time.time(), (file_name or "")[:120], grade,
                      payload.get("admission", "") or "",
                      1 if dual_sample else 0,
                      total,
+                     src,
                      json.dumps(payload, ensure_ascii=False)),
                 )
                 c.commit()
@@ -194,6 +221,33 @@ def get_report(rid: int) -> Optional[Dict[str, Any]]:
         return None
     payload["_id"] = rid
     return payload
+
+
+def get_report_source(rid: int) -> Optional[tuple]:
+    """按 id 取历史报告存下的**源文件正文**。
+
+    返回 (content, kind) 二元组，kind 固定为 \"report\"；
+    记录不存在 / 该记录没存正文（旧版本写的）/ 读取出错，返回 None。
+
+    与 get_report 分开：正文只在「查看源文件」时按需取，不跟着报告详情返回。
+    """
+    if not DB_WRITABLE:
+        return None
+    with _lock:
+        try:
+            with _conn() as c:
+                row = c.execute(
+                    "SELECT source_text FROM reports WHERE id = ?", (rid,)
+                ).fetchone()
+        except sqlite3.Error as exc:
+            print(f"[storage] 读取源文本失败：{exc}")
+            return None
+    if row is None:
+        return None
+    src = row["source_text"]
+    if not src:
+        return None
+    return (src, "report")
 
 
 def count_reports() -> int:
