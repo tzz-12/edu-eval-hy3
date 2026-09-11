@@ -45,7 +45,7 @@ python scripts/pregen_demo_reports.py
 输出到 `data/demo_reports/`：
 - `01_good_二次函数.json` —— 好样本，期望 PASS
 - `02_bad_formula.json` —— 注入公式错误，期望 FAIL（G0 红线）
-- `03_bad_fake_socratic.json` —— 注入伪启发包装，期望启发引导维度低分
+- `03_bad_fake_socratic.json` —— 注入伪启发包装，期望被识破（当前裁判口径下触发安全红线不通过，维度 6/9 低分）
 
 > 预生成 3 份报告在双采样模式下约消耗 80~120 次模型调用。**耗时完全取决于裁判模型**：
 > 当前裁判 `hy4-preview` 单次调用约 200 秒，单份报告约 30~40 分钟（且容量受限，需靠
