@@ -7,10 +7,10 @@
 仓库根目录的 `.env`（gitignored）需配置：
 
 ```ini
-HY3_BASE_URL=https://openrouter.ai/api/v1
-HY3_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxx
-HY3_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
-HY3_MAX_TOKENS=8192
+HY3_BASE_URL=https://你的-Hy3-端点/v1
+HY3_API_KEY=你的密钥
+HY3_MODEL=hy3
+HY3_MAX_TOKENS=16384
 HY3_TIMEOUT=300
 ```
 
@@ -47,9 +47,9 @@ python scripts/pregen_demo_reports.py
 - `02_bad_formula.json` —— 注入公式错误，期望 FAIL（G0 红线）
 - `03_bad_fake_socratic.json` —— 注入伪启发包装，期望启发引导维度低分
 
-> OpenRouter 免费层每日 50 次额度（`free-models-per-day`），预生成 3 份报告
-> 会消耗约 80-120 次 API 调用（双采样模式）。建议额度重置后跑。
-> 已生成的报告可重复使用，不会再次扣额度。
+> 预生成 3 份报告在双采样模式下约消耗 80~120 次 Hy3 调用，单份耗时约 2~25 分钟。
+> 已生成的报告可重复使用，不会再次消耗额度；改了哪份就跑哪份：
+> `python scripts/pregen_demo_reports.py 01`。
 
 ## 4. API 端点
 
@@ -61,6 +61,7 @@ python scripts/pregen_demo_reports.py
 | POST | `/api/evaluate` | 同步评测（30-90s） |
 | GET | `/api/reports` | 历史报告列表 |
 | GET | `/api/reports/{id}` | 单条历史报告 |
+| GET | `/api/manual` | 评测说明数据：维度口径 / 权重 / 分档阈值 / 参数，实时读 `eval/dimensions.py`（不手抄，避免文档与实现漂移）|
 | GET | `/` | 单页前端 |
 
 `POST /api/evaluate` 请求体：
@@ -92,7 +93,7 @@ python scripts/pregen_demo_reports.py
 `/api/health` 的 `db_path` / `db_note` 会暴露实际落点，前端顶栏也会显示「历史库已降级」。
 所有 DB 操作出错时降级为返回空值，**不会把 500 抛给前端**。
 
-## 5. 目录结构
+## 6. 目录结构
 
 ```
 src/edu_eval/api/        # FastAPI 应用
@@ -125,7 +126,7 @@ results/
 | 现象 | 排查 |
 |---|---|
 | `/api/health` 返回 `api_key_configured: false` | `.env` 未被 source，或未 export `HY3_API_KEY` |
-| 评测返回 500 + `RateLimitError` | OpenRouter 免费层日额度耗尽，等明早重置，或换模型 |
+| 评测返回 500 + `RateLimitError` / 402 | 端点额度耗尽或未开通后付费；换端点或等额度恢复 |
 | 演示按钮点击 404 | `data/demo_reports/` 下无对应文件，先跑 `pregen_demo_reports.py` |
 | `/api/reports` 500 + `disk I/O error` | 历史库路径不可写；`/api/health` 查 `db_path`/`db_note`，必要时用 `EDU_EVAL_DEMO_DB` 指定可写目录 |
 | 顶栏显示「历史库已降级」 | `results/` 不可写，已自动落到临时目录；评测本身不受影响，只是历史不持久 |

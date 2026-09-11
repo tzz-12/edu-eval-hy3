@@ -26,7 +26,7 @@ class Hy3Config:
     def from_env(cls, require_key: bool = True) -> "Hy3Config":
         base_url = (os.getenv("HY3_BASE_URL") or "").strip()
         api_key = (os.getenv("HY3_API_KEY") or "").strip()
-        model = (os.getenv("HY3_MODEL") or "hunyuan-turbo").strip()
+        model = (os.getenv("HY3_MODEL") or "hy3").strip()
         mock = (os.getenv("HY3_MOCK") or "0").strip() in ("1", "true", "True")
         max_tokens_raw = (os.getenv("HY3_MAX_TOKENS") or "").strip()
         max_tokens = int(max_tokens_raw) if max_tokens_raw.isdigit() else 8192
