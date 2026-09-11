@@ -54,7 +54,6 @@ def _grade_bands() -> list[dict]:
     return bands
 
 
-@router.get("/api/manual")
 def _judge_info() -> dict:
     """当前生效的裁判模型（读环境变量，不硬编码）。
 
@@ -72,6 +71,7 @@ def _judge_info() -> dict:
     return {"model": cfg.model, "endpoint_host": host, "mock": bool(cfg.mock)}
 
 
+@router.get("/api/manual")
 def manual() -> dict:
     dim_to_group = {d: g for g, ds in D.JUDGE_GROUPS.items() for d in ds}
 

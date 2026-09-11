@@ -307,3 +307,53 @@ def test_json_default_used_by_pregen():
 
     json.dumps({"n": sympy.Integer(9), "s": {3, 1}}, default=json_default)
     assert json_default(sympy.Integer(9)) == 9
+
+
+# ---------------------------------------------------------------- /api/manual
+
+
+def test_manual_returns_full_payload(client):
+    """说明面板端点必须返回完整口径：维度 / 权重 / 分档 / 分组 / 裁判模型。
+
+    回归用例（2026-09-11）：把 _judge_info() 插在 `@router.get("/api/manual")`
+    与 `manual()` 之间后，装饰器改贴到了新函数上——端点只返回
+    `{"model": ..., "endpoint_host": ...}`，dimensions 变成空。
+    当时全量测试没拦住，因为**此前没有任何 manual 端点的用例**。
+    """
+    c, _ev, _st = client
+    r = c.get("/api/manual")
+    assert r.status_code == 200
+    d = r.json()
+    assert len(d["dimensions"]) == 10
+    assert d["weight_sum"] == 100
+    assert d["grade_bands"], "分档阈值不能为空"
+    assert d["judge_groups"], "Judge 分组不能为空"
+    assert "judge" in d, "裁判模型是评测口径的一部分，必须随面板返回"
+    assert d["judge"].get("model"), "裁判模型名不能为空"
+
+
+def test_manual_dimensions_carry_weights_anchors_and_groups(client):
+    """维度条目必须带全前端渲染所需字段（含 judge_group 归属）。"""
+    c, _ev, _st = client
+    dims = c.get("/api/manual").json()["dimensions"]
+    ids = {d["id"] for d in dims}
+    assert {"1", "2", "9", "A"} <= ids
+    for d in dims:
+        for key in ("name", "weight", "priority", "anchors", "judge_group", "in_total"):
+            assert key in d, f"维度 {d['id']} 缺字段 {key}"
+    # G0 闸门（维度 2）与辅助维度 A 都不计入总分权重
+    by_id = {d["id"]: d for d in dims}
+    assert by_id["2"]["weight"] == 0
+    assert by_id["A"]["weight"] == 0
+
+
+def test_manual_judge_is_not_a_route_of_its_own(client):
+    """反方向：/api/manual 不能被 _judge_info 之类的小函数顶替。
+
+    断言返回体里同时有 dimensions 与 judge —— 只返回 judge 的旧故障形态
+    必然缺 dimensions，这条能立刻报错。
+    """
+    c, _ev, _st = client
+    d = c.get("/api/manual").json()
+    assert "dimensions" in d and "judge" in d
+    assert set(d.keys()) != {"model", "endpoint_host", "mock"}
