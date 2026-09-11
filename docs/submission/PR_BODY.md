@@ -1,25 +1,52 @@
-# PR 描述草稿（向 Tencent-Hunyuan/Hy3 的 rhinobird2026 分支提交）
+# 向 Tencent-Hunyuan/Hy3 的 rhinobird2026 分支提交 PR —— 状态与操作
 
-## 提交步骤
+> 对应 issue：[#4 Build a vibe-coded application powered by Hy3](https://github.com/Tencent-Hunyuan/Hy3/issues/4)
+> 当前状态：**fork 与分支已备好，PR 尚未打开**（等作者过目标题与正文）
+
+---
+
+## ✅ ① fork —— 已完成（2026-09-11）
 
 ```bash
-# ① fork（只需一次，会 fork 到 tzz-12/Hy3）
 gh repo fork Tencent-Hunyuan/Hy3 --clone=false
+# → https://github.com/tzz-12/Hy3 （isFork = true）
+```
 
-# ② 在 fork 上建分支并加提交材料
-git clone https://github.com/tzz-12/Hy3.git /tmp/hy3-fork
-cd /tmp/hy3-fork
-git checkout -b submissions/edueval-hy3 origin/rhinobird2026
-mkdir -p submissions/edueval-hy3
-cp /Users/tzz/WorkBuddy/edu-eval-hy3/docs/submission/README.md submissions/edueval-hy3/README.md
-git add submissions/edueval-hy3/README.md
-git commit -m "submissions: EduEval —— 基于 Hy3 的初中数学教学设计质量评估器（独立仓库）"
-git push -u origin submissions/edueval-hy3
+## ✅ ② 分支与提交材料 —— 已完成
 
-# ③ 提 PR（base 必须是 rhinobird2026，不是 main）
-gh pr create --repo Tencent-Hunyuan/Hy3 --base rhinobird2026 \
+fork 上已建好分支 `submissions/edueval-hy3`（基于上游 `rhinobird2026` 的 `8a12d9a`），
+并加了一个提交 `58566fe`：
+
+```
+submissions/edueval-hy3/README.md      新增 1 个文件（3312 B），无其他改动
+```
+
+照同类提交的惯例（参考上游 PR #223 / #222 / #219：独立仓库只加一个
+`submissions/<项目名>/README.md` 作指针，内容 = 项目说明 + 独立仓库链接）。
+
+**差异预览**（这不是 PR，只是看改了什么）：
+
+```
+https://github.com/Tencent-Hunyuan/Hy3/compare/rhinobird2026...tzz-12:submissions/edueval-hy3
+```
+
+## ⏳ ③ 提 PR —— 待执行
+
+⚠️ **base 必须是 `rhinobird2026`，不是 `main`。**
+
+```bash
+gh pr create --repo Tencent-Hunyuan/Hy3 \
+  --base rhinobird2026 \
   --head tzz-12:submissions/edueval-hy3 \
-  --title "..." --body-file /Users/tzz/WorkBuddy/edu-eval-hy3/docs/submission/PR_BODY.md
+  --title "【犀牛鸟实战】EduEval：基于 Hy3 的初中数学教学设计质量评估器（独立仓库）" \
+  --body-file /Users/tzz/WorkBuddy/edu-eval-hy3/docs/submission/PR_MESSAGE.md
+```
+
+### 撤销方法（都不影响上游仓库）
+
+```bash
+gh api -X DELETE /repos/tzz-12/Hy3/git/refs/heads/submissions/edueval-hy3   # 只删分支
+gh repo delete tzz-12/Hy3                                                   # 删掉整个 fork
 ```
 
 ---
@@ -30,57 +57,9 @@ gh pr create --repo Tencent-Hunyuan/Hy3 --base rhinobird2026 \
 【犀牛鸟实战】EduEval：基于 Hy3 的初中数学教学设计质量评估器（独立仓库）
 ```
 
----
-
 ## PR 正文
 
-```markdown
-## 项目简介
+**唯一事实来源：`docs/submission/PR_MESSAGE.md`**（`--body-file` 直接指向它）。
+下方不再复制一份，避免两份正文漂移。
 
-EduEval 评估 **AI 生成的初中数学单课时教学设计** 的质量，把「教得好」这种主观质量
-转化为可操作、可复核、可抵御表面包装的判定：先做知识正确性准入（不合格直接 FAIL，
-不进评分），再对 8 个加权维度打分给出 0~100 总分，同时输出证据定位与改进建议。
-
-- **应用类型**：教育类 · 教学设计质量评测（Web 应用）
-- **独立仓库**：https://github.com/tzz-12/edu-eval-hy3
-- **对应 issue**：#4 Build a vibe-coded application powered by Hy3
-- **开发工具**：WorkBuddy + Hy3 API
-
-## Hy3 在系统中承担的角色
-
-系统是「确定性层 + Hy3 语义层」的双层结构，划分原则是**能被程序验证的绝不交给模型**：
-
-| 层次 | 承担者 | 职责 |
-|---|---|---|
-| 确定性层（零 LLM） | 本地代码 | 多格式解析、本地知识库三层检索、sympy 公式恒等验算、概念→年级映射查表、章节结构检查、加权聚合与准入决议 |
-| 语义层 | **Hy3 API** | 事实核验、教学设计判断、表达与安全审读、证据复核与仲裁 |
-| 稳定性层 | **Hy3 API** | 双采样自一致：同一提示独立采样两次，两视角分歧超阈值时交由 Hy3 仲裁 |
-
-Hy3 以 5 类角色提示（fact / design / expression_safety / review / arbitrate）承载 10 个维度的判定；
-一次完整评测在双采样开启时产生约 8~20 次 Hy3 调用。**全程只通过 API 调用 Hy3，不训练、不微调、
-不做本地推理部署。**
-
-## 对照 issue 要求
-
-| 要求 | 落实情况 |
-|---|---|
-| 全程通过 API 调用 Hy3，不训练 / 微调 / 本地部署 | 所有语义判定经 Hy3 API；密钥仅走环境变量，代码不硬编码 |
-| 至少 1 个可交互前端 | Web 应用：对话式评测界面 + 报告 5 标签页 + 内嵌雷达图/图表 + 评测说明面板 |
-| 至少 2 个端到端 demo 流程，附 ≤2 min 视频或 GIF | 3 条流程：① 好样本 PASS ② 公式错误被规则层 0.5 秒拦截 ③ 伪启发包装被维度 9 判低分；演示视频见仓库 `docs/demo.mp4`（录屏脚本 `docs/demo_video.md`）|
-| 项目开源，README 写明 Hy3 角色 | 仓库 public（MIT）；README §1.1 专节说明 Hy3 的职责与不负责的部分 |
-| README 记录哪些代码由 CodeBuddy 协作 | README §10「AI 协作说明」按模块记录 WorkBuddy 的协作范围 |
-
-## 项目亮点
-
-1. **知识正确性准入优先**：先用本地知识库检索 + 程序计算 + 事实核验把控概念、公式、适用条件，
-   任一确认错误即 FAIL，证据不足即 NE——避免「教学环节写得好」把知识错误掩盖过去。
-2. **零 LLM 的确定性规则层**：公式恒等错误、年级越界、章节结构完整性由代码判定，
-   实测对注入样本 **0.5 秒**出结论、一次模型调用都不发。
-3. **可抵御表面包装**：针对「伪启发」（表面有提问、实际自问自答）等对抗性缺陷，
-   在判别力实验中按 base / mild / severe 三档验证了 5 个关键维度的分差。
-
-## 说明
-
-本 PR 只提交项目说明与仓库链接，**不改动 Hy3 仓库自身的代码**。
-本仓库为活动个人作品，并非腾讯官方发布，不代表腾讯公司立场。
-```
+正文包含五节：项目简介 / Hy3 在系统中承担的角色 / 对照 issue 要求 / 项目亮点 / 说明。
