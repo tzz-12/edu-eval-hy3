@@ -106,19 +106,25 @@ function destroyCharts(prefix) {
   try {
     healthInfo = await api("GET", "/api/health");
     const ok = healthInfo.api_key_configured;
-    let html;
+    // 状态行固定「一个圆点 + 一句状态」，异常信息并入同一个点：
+    // 原来是 db_note 时再追加一个 warn 点，网格布局下会被挤到第二行去。
+    let dotCls = ok ? "dot-green" : "dot-red";
+    let label = ok ? "API 已配置" : "API 未配置";
     if (healthInfo.demo_mode) {
       // 演示模式下没配 key 是预期状态，显示成「API 未配置」会被误读成系统坏了
-      html = `<span class="dot dot-demo"></span><span>演示模式</span>`;
-    } else {
-      html = `<span class="dot ${ok ? "dot-green" : "dot-red"}"></span><span>${ok ? "API 已配置" : "API 未配置"}</span>`;
+      dotCls = "dot-demo"; label = "演示模式";
     }
     if (!healthInfo.db_writable) {
-      html = `<span class="dot dot-warn" title="${escHtml(healthInfo.db_note || "历史库不可写")}"></span><span>历史库只读</span>`;
-    } else if (healthInfo.db_note) {
-      html += `<span class="dot dot-warn" title="${escHtml(healthInfo.db_note)}"></span>`;
+      dotCls = "dot-warn"; label = "历史库只读";
     }
-    $("#healthBadge").innerHTML = html;
+    const dbTip = healthInfo.db_note || (healthInfo.db_writable ? "" : "历史库不可写");
+    // 裁判模型名常驻侧栏：判别力/稳定性数据不可跨模型比较，换没换裁判要一眼可见
+    const modelBit = healthInfo.model
+      ? `<span class="status-model" title="${escHtml(healthInfo.model)}">${escHtml(healthInfo.model)}</span>`
+      : "";
+    $("#healthBadge").innerHTML =
+      `<span class="dot ${dotCls}"${dbTip ? ` title="${escHtml(dbTip)}"` : ""}></span>` +
+      `<span>${label}</span>` + modelBit;
     $("#headModel").textContent = healthInfo.model || "";
   } catch {
     $("#healthBadge").innerHTML = `<span class="dot dot-red"></span><span>后端未连接</span>`;
@@ -230,26 +236,39 @@ async function loadConversations() {
   try {
     const list = await api("GET", "/api/reports");
     if (!list.length) {
-      box.innerHTML = `<div class="conv-empty">暂无历史，提交一次评测后会出现在这里</div>`;
+      box.innerHTML = `
+        <div class="conv-empty">
+          <span class="conv-empty-icon">◎</span>
+          <b>还没有评测记录</b>
+          <span>粘贴一份课件、或从演示样本开始，<br>结果会留在这里</span>
+        </div>`;
       return;
     }
-    box.innerHTML = list.map(r => `
-      <button class="conv-item" data-id="${r.id}">
+    box.innerHTML = list.map(r => {
+      const adm = (r.admission || "NE").toLowerCase();
+      const score = r.total_score != null ? Math.round(r.total_score) + " 分" : "未出分";
+      return `
+      <button class="conv-item is-${adm}" data-id="${r.id}">
         <div class="conv-top">
           <span class="conv-name">${escHtml(r.file_name || "未命名")}</span>
-          <span class="badge-mini badge-${(r.admission || "NE").toLowerCase()}">${escHtml(r.admission || "—")}</span>
+          <span class="badge-mini badge-${adm}">${escHtml(r.admission || "—")}</span>
         </div>
         <div class="conv-meta">
           <span>${fmtTime(r.created_at)}</span>
           <span>${escHtml(r.grade || "")}</span>
-          <span>${r.total_score != null ? Math.round(r.total_score) + " 分" : "未出分"}</span>
+          <span>${score}</span>
         </div>
-      </button>
-    `).join("");
+      </button>`;
+    }).join("");
     $$("#convList .conv-item").forEach(b =>
       b.addEventListener("click", () => openConversation(b.dataset.id)));
   } catch (e) {
-    box.innerHTML = `<div class="conv-empty">历史加载失败：${escHtml(e.message)}</div>`;
+    box.innerHTML = `
+      <div class="conv-empty">
+        <span class="conv-empty-icon">!</span>
+        <b>历史加载失败</b>
+        <span>${escHtml(e.message)}</span>
+      </div>`;
   }
 }
 
