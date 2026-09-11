@@ -38,3 +38,9 @@ results/demo.log
 
 # 预生成的演示报告（mock 模式下无效；用真实 API 重跑 scripts/pregen_demo_reports.py 产出）
 data/demo_reports/
+
+# 重跑 demo 报告前的手工备份（cp -r 产生，不需入库）
+data/demo_reports.bak.*/
+
+# 工具工作目录
+.workbuddy/
