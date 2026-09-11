@@ -22,6 +22,7 @@
           </div>
         </div>
         <button id="newChatBtn" class="btn-new">＋ 新建评测</button>
+        <button id="helpBtn" class="btn-help">评测说明 · 维度与参数</button>
       </div>
 
       <div class="conv-list" id="convList">
@@ -46,6 +47,7 @@
         </div>
         <div class="head-right">
           <span class="head-model" id="headModel"></span>
+          <button class="icon-btn" id="headHelpBtn" title="评测说明" aria-label="评测说明">?</button>
         </div>
       </header>
 
@@ -55,8 +57,13 @@
           <div class="welcome-inner">
             <div class="welcome-logo">EE</div>
             <h2>把课件交给 EduEval 评一评</h2>
-            <p>粘贴一份 AI 生成的教案或课件，系统会从 9 个维度给出评分，
-               用规则层零成本拦截知识性硬伤，并用双采样自一致压住 LLM 打分的随机性。</p>
+            <p>粘贴一份 AI 生成的教案或课件，系统先过知识正确性闸门，
+               再按 8 个加权维度逐项打分，并用双采样自一致压住 LLM 打分的随机性。</p>
+
+            <button class="welcome-guide" id="welcomeHelp">
+              第一次用？先看评测说明：评什么、怎么算、参数怎么选
+              <span class="welcome-guide-arrow">→</span>
+            </button>
 
             <div class="welcome-feats">
               <div class="feat">
@@ -66,8 +73,8 @@
               </div>
               <div class="feat">
                 <span class="feat-k">02</span>
-                <b>九维加权评分</b>
-                <span class="feat-desc">教学目标、学段适配、教-学-评一致性等逐维打分，每条结论都附原文证据</span>
+                <b>八维加权评分</b>
+                <span class="feat-desc">教学目标、学段适配、教-学-评一致性等 8 个加权维度逐项打分，每条结论都附原文证据</span>
               </div>
               <div class="feat">
                 <span class="feat-k">03</span>
@@ -123,18 +130,48 @@
             <span>年级</span>
             <select id="gradeSelect"><option value="">加载中…</option></select>
           </label>
+          <button type="button" class="info" data-sec="param-grade"
+                  title="为什么要声明年级" aria-label="年级参数说明">?</button>
+
           <label class="tool chk" title="同一裁判用两个视角各评一次，分歧超阈值转仲裁，压制单次采样抖动">
             <input type="checkbox" id="dualSampleCheck" checked>
             <span>双采样自一致</span>
           </label>
+          <button type="button" class="info" data-sec="param-dual"
+                  title="双采样自一致是什么意思" aria-label="双采样参数说明">?</button>
+
           <label class="tool" title="两位裁判的维度分差超过此值时触发层内仲裁；默认 1">
             <span>分差阈值</span>
             <input type="number" id="dualThresholdInput" value="1" min="0" max="4">
           </label>
+          <button type="button" class="info" data-sec="param-threshold"
+                  title="分差阈值怎么取" aria-label="分差阈值参数说明">?</button>
+
           <span id="composerHint" class="composer-hint"></span>
+          <button type="button" class="settings-help" data-sec="params">参数说明</button>
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- ============ 评测说明（用户手册）：内容由 /api/manual 渲染 ============ -->
+  <div class="manual" id="manual" aria-hidden="true">
+    <div class="manual-backdrop" data-manual-close></div>
+    <div class="manual-panel" role="dialog" aria-modal="true" aria-labelledby="manualTitle">
+      <header class="manual-head">
+        <div class="manual-head-text">
+          <h2 id="manualTitle">EduEval 评测说明</h2>
+          <p>评测维度、判定口径与参数含义</p>
+        </div>
+        <button class="manual-close" id="manualClose" title="关闭" aria-label="关闭">✕</button>
+      </header>
+      <div class="manual-body">
+        <nav class="manual-toc" id="manualToc" aria-label="章节目录"></nav>
+        <article class="manual-content" id="manualContent">
+          <div class="loading">加载中…</div>
+        </article>
+      </div>
+    </div>
   </div>
 
   <div class="scrim" id="scrim"></div>

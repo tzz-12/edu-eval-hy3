@@ -78,7 +78,7 @@ const DIM_ORDER = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "A"];
 
 // 演示样本的补充说明（id → 一句话说明）
 const DEMO_DESC = {
-  "01_good_二次函数": "结构完整的合格教案，九个维度均衡",
+  "01_good_二次函数": "结构完整的合格教案，各维度表现均衡",
   "02_bad_formula": "故意植入 3 处公式错误，规则层零 LLM 拦截",
   "03_bad_fake_socratic": "只有提问外壳、没有认知引导的伪启发",
 };
@@ -183,6 +183,19 @@ function bindEvents() {
   $("#scrim").addEventListener("click", () => {
     $("#sidebar").classList.remove("open");
     $("#scrim").classList.remove("show");
+  });
+
+  // ---- 评测说明入口：侧栏 / 顶栏 / 欢迎页 / 参数旁 ----
+  $("#helpBtn").addEventListener("click", () => openManual("what"));
+  $("#headHelpBtn").addEventListener("click", () => openManual("what"));
+  $("#welcomeHelp").addEventListener("click", () => openManual("what"));
+  $("#manualClose").addEventListener("click", closeManual);
+  $$("[data-manual-close]").forEach((b) => b.addEventListener("click", closeManual));
+  // 参数旁的 ? 与「参数说明」链接：直接跳到对应章节
+  $$("[data-sec]").forEach((b) =>
+    b.addEventListener("click", () => openManual(b.dataset.sec)));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("#manual").classList.contains("show")) closeManual();
   });
 }
 
@@ -1143,4 +1156,336 @@ function drawRules(r, cid) {
       },
     }));
   }
+}
+
+// ============================================================
+// 评测说明（用户手册）
+// ------------------------------------------------------------
+// 首次使用者看不懂「分差阈值」这类参数，也不知道维度是怎么划的。
+// 维度名、权重、锚点、分档**一律从 /api/manual 取**，前端不抄一份：
+// 评测口径只有 Python 一个来源，说明页就不可能与报告漂移。
+// ============================================================
+
+const MANUAL_SECTIONS = [
+  ["what", "这是什么"],
+  ["flow", "评测流程"],
+  ["dims", "评测维度"],
+  ["params", "参数说明"],
+  ["reading", "结果怎么读"],
+  ["faq", "常见问题"],
+];
+
+const PRI_NOTE = {
+  G0: "准入门槛 · 不通过不出分",
+  P0: "底线 · 含红线",
+  P1: "核心",
+  P2: "教学质量",
+  P3: "可用性",
+  AUX: "辅助 · 不计入总分",
+};
+
+// 分档说明按「由低到高」的位次给，不按标签文字匹配——
+// 标签文字来自后端，改动后这里不会因为对不上而静默丢说明。
+const BAND_NOTES_ASC = [
+  "不建议直接使用",
+  "基本可用，但存在明确短板",
+  "可用，个别维度待打磨",
+  "结构完整，可直接使用",
+];
+
+const THRESHOLD_ROWS = [
+  ["0", "两次差 1 分就仲裁", "最保守、最慢，调用量最大"],
+  ["1", "差 1 分算一致，取平均", "默认值，一致性与成本的平衡点"],
+  ["2", "差 2 分以内都取平均", "偏宽松，轻度分歧被平均盖掉"],
+  ["4", "几乎不仲裁", "最快，但基本放弃了自一致这道防线"],
+];
+
+let manualData = null;
+let manualReq = null;
+
+function anchorHTML(text) {
+  return String(text || "").split("\n").map((line) => {
+    const t = line.trim();
+    let cls = "";
+    if (/^[12]\s*分/.test(t)) cls = "m-a-low";
+    else if (/^3\s*分/.test(t)) cls = "m-a-mid";
+    else if (/^5\s*分/.test(t)) cls = "m-a-high";
+    else if (/^(强制规则|降级规则|判前必查|准入规则|红线规则|误判保护|判定原则|伪启发识别|降档)/.test(t)) cls = "m-a-rule";
+    const safe = escHtml(line);
+    return cls ? `<span class="${cls}">${safe}</span>` : safe;
+  }).join("\n");
+}
+
+function dimCardHTML(d) {
+  const tags = [`<span class="m-tag pri">${escHtml(PRI_NOTE[d.priority] || d.priority)}</span>`];
+  if (d.redline) tags.push(`<span class="m-tag redline">红线</span>`);
+  const grp = (manualData && manualData.judge_groups || []).find((g) => g.key === d.judge_group);
+  if (grp) tags.push(`<span class="m-tag">${escHtml(grp.label)}</span>`);
+  (d.competency_link || []).forEach((c) => tags.push(`<span class="m-tag">${escHtml(c)}</span>`));
+  const wTxt = d.weight > 0 ? `${d.weight}%` : "不计分";
+  return `
+    <div class="m-dim">
+      <div class="m-dim-top">
+        <span class="m-dim-id">${escHtml(d.id)}</span>
+        <span class="m-dim-name">${escHtml(d.name)}</span>
+        <span class="m-dim-weight ${d.weight > 0 ? "" : "zero"}">${wTxt}</span>
+      </div>
+      <div class="m-dim-desc">${escHtml(d.description)}</div>
+      <div class="m-dim-tags">${tags.join("")}</div>
+      <button class="m-dim-toggle" data-anchor="${escHtml(d.id)}">查看 1 · 3 · 5 分锚点 ▾</button>
+      <div class="m-anchors" id="m-anchor-${escHtml(d.id)}" hidden>${anchorHTML(d.anchors)}</div>
+    </div>`;
+}
+
+function renderManual(m) {
+  const dims = m.dimensions || [];
+  const weighted = dims.filter((d) => d.weight > 0);
+  const bandRows = (m.grade_bands || [])
+    .map((b, i) => ({ ...b, note: BAND_NOTES_ASC[i] || "" }))
+    .reverse()
+    .map((b) => `
+      <div class="m-band">
+        <span class="m-band-range">${b.min} – ${b.max}</span>
+        <span class="m-band-label">${escHtml(b.label)}</span>
+        <span class="m-band-note">${escHtml(b.note)}</span>
+      </div>`).join("");
+  const lowCov = Math.round((m.low_coverage_ratio || 0.6) * 100);
+
+  $("#manualToc").innerHTML = MANUAL_SECTIONS.map(([id, label], i) =>
+    `<button data-toc="${id}"${i === 0 ? ' class="active"' : ""}>${label}</button>`).join("");
+
+  $("#manualContent").innerHTML = `
+    <section data-sec-id="what">
+      <h3>这是什么</h3>
+      <p>EduEval 评的是 <b>AI 生成的 K-12 教学材料</b>——把教案或课件文本粘进来（或上传
+        <code>.md</code> / <code>.txt</code> / <code>.pdf</code>），系统给出可复核的评分与改进建议。</p>
+      <ul>
+        <li><b>输出结构</b>：知识准入结论 + ${weighted.length} 个加权维度分 + 1 个辅助维度 + 规则层发现 + 改进建议，
+            每条维度结论都要求引用<b>原文证据</b>，而不是只给一个分数。</li>
+        <li><b>评什么学科</b>：K-12 数学是主线（物理同理）。<b>学科由评估器自动识别</b>，不需要你声明。</li>
+        <li><b>学段由你声明</b>：在下方「评测设置」里选年级。评测器会核对<b>声明学段与实际内容</b>是否一致——
+            不一致本身就是一个质量风险信号，会体现在维度 3。</li>
+        <li><b>不训练、不微调</b>：全部能力来自「规则引擎 + 分维度提示词 + 多个裁判交叉复核」，
+            所以换裁判模型会改变分数（判别力与稳定性数据也不可跨模型比较）。</li>
+      </ul>
+      <p>当前裁判模型：<code>${escHtml((healthInfo && healthInfo.model) || "未连接")}</code>。
+        本页的维度、权重与分档是<b>实时读自评测器配置</b>的，与报告的判定口径同源。</p>
+    </section>
+
+    <section data-sec-id="flow">
+      <h3>评测流程</h3>
+      <p>一份材料要过四道关，越前面的越便宜——能在规则层拦下的问题不会花掉一次模型调用。</p>
+      <ol class="m-steps">
+        <li><b>规则层快筛<span class="m-cost free">零 LLM · 约 0.5 秒</span></b>
+            <span>用确定性代码检查公式恒等、年级越界、章节结构完整性。命中确定性硬伤（如公式两边不相等）
+            直接判 <b>FAIL</b>，后面一步都不走。</span></li>
+        <li><b>知识准入门槛 G0（维度 2）<span class="m-cost llm">调模型</span></b>
+            <span>核验概念、定义、公式、适用条件、推导过程与答案。结论三选一：
+            <b>PASS</b> 继续评分；<b>FAIL</b> 有确认的知识错误、不出总分；
+            <b>NE</b> 核心断言无法核验（知识库未覆盖 / 来源冲突 / 解析不可靠），同样不出总分。
+            无法确认时宁可 NE，不给一个可能错的判。</span></li>
+        <li><b>分维度评分<span class="m-cost llm">调模型</span></b>
+            <span>按维度分组并行评审：${(m.judge_groups || []).map((g) =>
+              `${escHtml(g.label)}负责维度 ${g.dims.map(escHtml).join(" / ")}`).join("；")}。</span></li>
+        <li><b>双采样自一致（层内）<span class="m-cost llm">调用翻倍</span></b>
+            <span>同一裁判用<b>两个视角各评一次</b>（严格对齐量规 / 站在学习者一边）。
+            分差在阈值内取平均；超出阈值、或任一次判 NE，就交给层内仲裁员回看原文裁定。
+            这一步是在压 LLM 打分的随机性。</span></li>
+        <li><b>跨层仲裁</b>
+            <span>不同 Judge 对同一维度给出分歧结论时，由仲裁 Judge 复核裁决。它与上一步管的是两件事：
+            上一步管「同一个裁判两次采样」，这一步管「不同裁判之间」。</span></li>
+        <li><b>聚合物化</b>
+            <span>按 Σ(维度分 ÷ 5 × 权重) ÷ Σ有效权重 × 100 算总分；安全红线一票否决；
+            有效权重覆盖不足时标注「低覆盖」，提示结论需谨慎引用。</span></li>
+      </ol>
+      <p>耗时参考：被规则层拦下的约 <b>1 秒内</b>返回；正常一份 3000–4000 字教案走完
+        <b>2–5 分钟</b>（双采样使模型调用数翻倍，个别维度还会追加仲裁）。</p>
+    </section>
+
+    <section data-sec-id="dims">
+      <h3>评测维度</h3>
+      <p>共 <b>${dims.length} 项</b>：1 个准入门槛（只作闸门、不计分）+ <b>${weighted.length} 个加权维度</b>
+        （权重合计 ${m.weight_sum}%）+ 1 个辅助维度（不计入总分）。下面按优先级排列，
+        点「查看锚点」可以看到每一档分数的具体判定依据。</p>
+      ${dims.map(dimCardHTML).join("")}
+      <p>优先级含义：<b>G0</b> 不过即不出分；<b>P0</b> 是底线，含红线；<b>P1</b> 是核心，权重最高；
+        <b>P2</b> 是教学质量；<b>P3</b> 是可用性；<b>AUX</b> 不计入总分。</p>
+      <p>每个维度还映射到课标 2022 第四学段的<b>核心素养主要表现</b>（共 ${(m.competencies || []).length} 项：
+        ${(m.competencies || []).map(escHtml).join("、")}），报告里会显示素养覆盖情况。</p>
+    </section>
+
+    <section data-sec-id="params">
+      <h3>参数说明</h3>
+      <div class="m-param" id="m-param-grade">
+        <div class="m-param-head"><b>年级</b><code>必选</code></div>
+        <p>声明这份材料的<b>目标学段</b>（七 / 八 / 九年级、高一 / 高二 / 高三）。</p>
+        <p><b>为什么要声明：</b>维度 3（学段与认知层次适配）要把「你声明的学段」和「评估器实际识别到的
+          知识范围、前置要求、任务难度」做比对。不声明，这一维度就无法判定，会被标成 NE——
+          评估器不会替你猜目标学段。声明与实际不一致不是报错，而是被判为<b>质量风险</b>，
+          会直接反映在维度 3 的得分上。</p>
+      </div>
+      <div class="m-param" id="m-param-dual">
+        <div class="m-param-head"><b>双采样自一致</b><code>默认开启</code></div>
+        <p>同一裁判对每个维度<b>调用两次</b>，两次用不同视角制造真实分歧：一次严格对齐量规，
+          一次站在学习者一边看这份材料够不够清楚。</p>
+        <p><b>为什么要这么做：</b>不是为了「多问一遍求安慰」，而是先把模型的方差<b>显式暴露出来</b>。
+          早期校准数据里，40 个维度对只有 28 个两次完全一致（70%），最大分差到过 4 分（一次判 1 分、
+          一次判 5 分）——说明<b>单次采样的分数本身不可复现</b>。开启后：一致就取平均降噪，
+          分歧就交仲裁裁决。</p>
+        <p><b>代价：</b>模型调用数翻倍，耗时就翻倍；关掉会快很多，但抖动明显变大。
+          做严肃对比实验时建议保持开启。</p>
+      </div>
+      <div class="m-param" id="m-param-threshold">
+        <div class="m-param-head"><b>分差阈值</b><code>取值 0–4 · 默认 1</code></div>
+        <p>两个视角在同一维度上的分差记作 |Δ|，它就是判定「算不算分歧」的那条线：</p>
+        <ul>
+          <li><b>|Δ| ≤ 阈值</b> → 认为一致，直接取两次平均（不再调用模型）。</li>
+          <li><b>|Δ| > 阈值</b> → 认为分歧，交给层内仲裁员，结合两次的推理与原文给出最终分。</li>
+          <li><b>任一次判 NE</b> → 无论分差多少都走仲裁。这一条与阈值无关，是一票触发——
+              实测出现过两次都没给有效分、却仍要裁决的情形，只比大小会漏掉这类不确定性。</li>
+        </ul>
+        <div class="m-dim-tags" style="margin-bottom:10px">
+          ${THRESHOLD_ROWS.map(([v, effect]) =>
+            `<span class="m-tag${v === "1" ? " pri" : ""}">阈值 ${v}：${escHtml(effect)}</span>`).join("")}
+        </div>
+        <p><b>怎么选：</b>保持 <b>1</b>。<b>调小</b>（0）更保守、更慢、更贵；<b>调大</b>（4）更快，
+          但等于放弃了自一致这道防线——分歧被平均掩盖，报告看起来更「稳」，实际更不可信。</p>
+      </div>
+    </section>
+
+    <section data-sec-id="reading">
+      <h3>结果怎么读</h3>
+      <p><b>先看闸门，再看分数。</b>三个闸门结论决定这份报告有没有总分：</p>
+      <ul>
+        <li><b>PASS</b>：知识与合规都没问题，正常给出加权总分。</li>
+        <li><b>FAIL</b>：有确认的知识错误，或触发了安全红线 —— <b>不出总分</b>。
+            这不是「分低」，而是「不值得评分」。</li>
+        <li><b>NE</b>：核心断言无法核验（如公式抽取不可靠、知识库未覆盖）—— 同样不出总分，
+            应先修解析或补依据，而不是当成材料质量差。</li>
+      </ul>
+      <p>有总分时按区间分档：</p>
+      ${bandRows}
+      <p><b>维度分是 1–5 分，权重不同。</b>同样的「5 分」贡献不同：维度 1 与 8 各占 20%，
+        维度 5 只占 5%。看短板时优先看高权重维度。</p>
+      <p><b>关于 NE 与低覆盖。</b>某个维度取不到有效结论时记 NE，它<b>按有效权重归一化</b>——
+        即把该维度的权重从分母里去掉，而不是当 0 分。这是有意的：知识库缺口或证据不足是
+        <b>评测器的局限</b>，不该被算成材料的问题。但当有效权重低于 ${lowCov}% 时会标注「低覆盖」，
+        此时总分仅供参考。</p>
+      <p><b>同一份材料两次结果可能不同。</b>LLM 打分本身带方差，双采样只是把它显式化而不是消除它。
+        做严谨对比（比如验证某个改动是否真的提升了质量）请多次采样取众数，仓库里的实验脚本
+        <code>--repeat N</code> 就是干这个的，并且必须禁用缓存。</p>
+      <p><b>五个页签</b>：总览看结论，维度详情看每一维的分数与证据，一致性看双采样两次结果与仲裁情况，
+        规则层看零 LLM 的确定性发现，改进建议是可执行的修改清单。</p>
+    </section>
+
+    <section data-sec-id="faq">
+      <h3>常见问题</h3>
+      <details class="m-faq"><summary>点演示样本为什么秒出结果？</summary>
+        <p>演示样本读的是<b>预生成报告</b>，不调用模型、不消耗额度，所以是秒级。
+          它们也不会进入左侧历史——演示数据进去会把真实评测记录搅混。</p></details>
+      <details class="m-faq"><summary>为什么这份材料没有总分？</summary>
+        <p>三种可能：知识准入判了 FAIL（有确认的知识错误）、触发了安全红线、或准入判了 NE
+          （核心断言无法核验）。第三种通常意味着解析质量或知识库覆盖有问题，而不是材料本身差。</p></details>
+      <details class="m-faq"><summary>一次评测要多久？会消耗多少额度？</summary>
+        <p>被规则层拦下的 1 秒内返回，且<b>一次模型调用都不发</b>。正常评测 2–5 分钟，
+          因为双采样会把调用数翻倍、个别维度还要追加仲裁。额度只在真实评测时消耗。</p></details>
+      <details class="m-faq"><summary>支持哪些学科和学段？</summary>
+        <p>K-12 数学是主线（物理同理）。学段覆盖七 / 八 / 九年级与高一 / 高二 / 高三。
+          学科不用声明，由评估器自动识别。</p></details>
+      <details class="m-faq"><summary>我粘贴的内容会被发到哪里？</summary>
+        <p>服务跑在本地，但真实评测时文档文本会作为提示词<b>发送给所配置的裁判模型</b>
+          （见侧栏状态行显示的模型名与 base_url）。演示样本不发送。
+          不要把不适合外发的内容粘进来。</p></details>
+      <details class="m-faq"><summary>结果能复现吗？</summary>
+        <p>同一模型、同一提示词版本下基本可复现。开启双采样后，两个视角的指令本身不同，
+          出现分歧属预期行为，会以仲裁或平均的形式被记录在报告的「一致性」页签里。</p></details>
+    </section>`;
+}
+
+function setActiveToc(sec) {
+  $$("#manualToc button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.toc === sec));
+}
+
+function gotoManualSection(sec) {
+  const wrap = $("#manualContent");
+  if (!wrap) return;
+  const raw = sec || "what";
+  // 参数旁的小问号指向「参数说明」里的某一张卡：直接把它带到视口中间，
+  // 只滚到章节顶部的话，点「分差阈值」却看到的是「年级」，还得自己往下找。
+  if (raw.indexOf("param-") === 0) {
+    const card = document.getElementById("m-" + raw);
+    setActiveToc("params");
+    if (!card) return;
+    card.scrollIntoView({ block: "center", behavior: "smooth" });
+    // 等滚动落位再高亮：否则动画在视口外就播完了，看到的是静止的卡片
+    setTimeout(() => {
+      card.classList.remove("flash");
+      void card.offsetWidth;      // 强制重排，让同一张卡能被连续高亮
+      card.classList.add("flash");
+    }, 380);
+    return;
+  }
+  const target = wrap.querySelector(`[data-sec-id="${raw}"]`);
+  if (target) {
+    target.scrollIntoView({ block: "start", behavior: "smooth" });
+    setActiveToc(raw);
+  }
+}
+
+function bindManualScrollSpy() {
+  const wrap = $("#manualContent");
+  if (!wrap || wrap.dataset.spy === "1") return;
+  wrap.dataset.spy = "1";
+  wrap.addEventListener("scroll", () => {
+    const secs = [...wrap.querySelectorAll("[data-sec-id]")];
+    if (!secs.length) return;
+    const base = wrap.getBoundingClientRect().top;
+    let cur = secs[0].dataset.secId;
+    for (const s of secs) {
+      if (s.getBoundingClientRect().top - base <= 56) cur = s.dataset.secId;
+    }
+    setActiveToc(cur);
+  });
+  // 维度锚点展开
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest(".m-dim-toggle");
+    if (!btn) return;
+    const box = document.getElementById(`m-anchor-${btn.dataset.anchor}`);
+    if (!box) return;
+    box.hidden = !box.hidden;
+    btn.textContent = box.hidden
+      ? "查看 1 · 3 · 5 分锚点 ▾"
+      : "收起锚点 ▴";
+  });
+  // 目录跳转
+  $("#manualToc").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-toc]");
+    if (b) gotoManualSection(b.dataset.toc);
+  });
+}
+
+function openManual(sec) {
+  const el = $("#manual");
+  el.classList.add("show");
+  el.setAttribute("aria-hidden", "false");
+  if (!manualReq) manualReq = api("GET", "/api/manual");
+  manualReq
+    .then((m) => {
+      manualData = m;
+      renderManual(m);
+      bindManualScrollSpy();
+      if (sec) gotoManualSection(sec);
+    })
+    .catch((e) => {
+      manualReq = null;   // 允许重试
+      $("#manualContent").innerHTML =
+        `<p>说明加载失败：${escHtml(e.message)}。请确认后端已启动。</p>`;
+    });
+}
+
+function closeManual() {
+  const el = $("#manual");
+  el.classList.remove("show");
+  el.setAttribute("aria-hidden", "true");
 }
