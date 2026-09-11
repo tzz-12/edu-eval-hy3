@@ -102,7 +102,7 @@ ffmpeg -i docs/demo.mp4 -vf "fps=12,scale=960:-1:flags=lanczos,split[s0][s1];[s0
 README 待补的两行（录完替换 `<链接>`）：
 
 ```markdown
-> 🎬 **演示视频（约 1 分 50 秒）**：[`docs/demo.mp4`](./docs/demo.mp4)
+> 🎬 **演示视频（94 秒）**：[`docs/demo.mp4`](./docs/demo.mp4)
 ```
 
 ---

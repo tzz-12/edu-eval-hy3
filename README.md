@@ -9,11 +9,11 @@
 
 ## 演示视频
 
-![EduEval 演示](docs/demo.gif)
+https://github.com/user-attachments/assets/63a95409-04e5-4238-a3c5-2defe77d0663
 
 94 秒完整走完三条评测流程：**① 好样本完整评测**（准入通过 → 总分 → 雷达图 / 维度 / 一致性）→ **② 公式错误被规则层零 LLM 拦截**（FAIL，约 0.5 秒）→ **③ 伪启发包装被判低分**（维度 9）。
 
-高清 MP4 版本（1280×832）：[`docs/demo.mp4`](./docs/demo.mp4)；分镜与字幕说明见 [`docs/demo_video.md`](./docs/demo_video.md)。
+高清 MP4（1280×832）随仓库分发：[`docs/demo.mp4`](./docs/demo.mp4)；分镜与字幕说明见 [`docs/demo_video.md`](./docs/demo_video.md)。
 
 ---
 
@@ -228,7 +228,7 @@ edu-eval-hy3/
 │   ├── kb_scope.md               # 知识库范围、已知局限与实测覆盖率
 │   ├── dimension_benchmarking.md # 与 EQuIP / Danielson FFT / 教育部优课量表的逐维对照
 │   └── demo.md                   # 演示应用部署、API 端点与故障排查
-└── tests/                  # 282 个测试（1 个因缺本地知识库而 skip）
+└── tests/                  # 319 个测试（1 个因缺本地知识库而 skip）
 ```
 
 ## 8. 能力边界（诚实说明）
@@ -299,7 +299,7 @@ python scripts/run_stability.py -n 5
 ### 8.3 当前状态
 
 Phase 0（不依赖模型的部分：多格式解析、知识库、规则层、聚合器）与 Phase 1
-（判别力 / 一致性 / 解析健壮性三项实验）均已完成，全量测试 `297 passed, 1 skipped`。
+（判别力 / 一致性 / 解析健壮性三项实验）均已完成，全量测试 `319 passed, 1 skipped`。
 当前推进最后一环：演示视频、提交材料与最终交付文档。
 
 ## 9. 许可与归属
@@ -320,7 +320,7 @@ Phase 0（不依赖模型的部分：多格式解析、知识库、规则层、�
 | 实验判读（判别力是否达标、稳定性是否可接受）与结论 | 作者 |
 | 代码实现：多格式解析、知识库三层检索、规则层、多 Judge 编排、聚合器、双采样自一致 | WorkBuddy 协作完成 |
 | 演示应用：FastAPI 后端、SQLite 历史、单页对话式前端与内嵌图表、评测说明面板 | WorkBuddy 协作完成 |
-| 实验脚本与回归测试（`scripts/` 全套 + `tests/` 282 条） | WorkBuddy 协作完成 |
+| 实验脚本与回归测试（`scripts/` 全套 + `tests/` 319 条） | WorkBuddy 协作完成 |
 | 文档整理：README、`docs/`、方案文档的章节重组与排版 | WorkBuddy 协作完成 |
 
 > 本表按**模块**说明协作范围，不做逐行标注；所有改动经作者审阅后才进入版本库。
