@@ -117,6 +117,8 @@ python -m edu_eval.web
 首次启动前若 `data/demo_reports/` 为空，首页的演示样本按钮不可用，先执行
 `bash scripts/run_demo.sh pregen --live` 生成预生成报告（约 2~25 分钟/份，见 `docs/demo.md`）。
 
+> 🎬 演示视频的分镜脚本、录制与导出方法见 [`docs/demo_video.md`](./docs/demo_video.md)。
+
 ### 5.3 知识库重建
 
 `data/kb/` 因许可原因不入库（K12-KGraph 为 CC BY-NC-SA 4.0），克隆后需本地重建：
