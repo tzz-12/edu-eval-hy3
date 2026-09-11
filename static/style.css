@@ -25,6 +25,9 @@
   --ink:       #23201B;
   --ink-dim:   #6B6357;
   --ink-faint: #9C9486;
+  /* 占位符单独一档：--ink-faint 在白底上只有约 3.1:1，
+     刚够当注释但不够当"这里可以输入"的提示，压深一档到约 3.9:1 */
+  --ink-placeholder: #8C8474;
 
   /* ---- 主色：靛蓝 ink ---- */
   --accent:      #3D4A8C;
@@ -89,7 +92,7 @@ html, body {
   flex: none;
   width: var(--sidebar-w);
   display: flex; flex-direction: column;
-  background: var(--surface-warm);
+  background: linear-gradient(180deg, #FDFCF9, var(--surface-warm) 180px);
   border-right: 1px solid var(--border);
 }
 .sidebar-head {
@@ -134,6 +137,21 @@ html, body {
 .btn-new:active { transform: translateY(1px); }
 
 .conv-list { flex: 1; overflow-y: auto; padding: var(--s1) var(--s3) var(--s3); }
+/* 历史分区标签：把「品牌 + 主操作」和「历史列表」在视觉上分开成两块。
+   计数只在有记录时出现；空列表时整行收起（空态本身已经讲清楚了）。 */
+.conv-head {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 15px var(--s4) 7px;
+  font-size: 11px; letter-spacing: .1em;
+  color: var(--ink-faint);
+}
+.conv-head.is-empty { display: none; }
+.conv-count {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0;
+  padding: 0 6px; border-radius: 999px;
+  background: var(--subtle); color: var(--ink-faint);
+}
+
 .conv-item {
   position: relative;
   display: block; width: 100%; text-align: left;
@@ -156,11 +174,11 @@ html, body {
 .conv-item.is-pass::before { background: var(--good); }
 .conv-item.is-fail::before { background: var(--bad); }
 .conv-item.is-ne::before   { background: var(--ne); }
-.conv-item:hover { background: #ECE7DC; }
+.conv-item:hover { background: #EFEAE0; }
 .conv-item.active {
   background: var(--surface);
-  border-color: var(--border-strong);
-  box-shadow: var(--sh-1);
+  border-color: var(--accent-line);
+  box-shadow: 0 1px 2px rgba(35,32,27,.05), 0 3px 12px rgba(35,32,27,.055);
 }
 .conv-top { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
 .conv-name {
@@ -216,7 +234,14 @@ html, body {
 .dot-demo  { background: var(--accent); }
 
 /* ============================ 主区 ============================ */
-.chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+/* 主区底色：纯 --paper 大面积铺开在暖色系里会发闷，
+   叠一层极淡的顶部高光（越靠上越亮）当"纸张受光"，层次就出来了。 */
+.chat {
+  flex: 1; display: flex; flex-direction: column; min-width: 0;
+  background:
+    radial-gradient(1100px 520px at 50% -12%, rgba(255, 255, 255, .62), rgba(255, 255, 255, 0) 72%),
+    var(--paper);
+}
 
 .chat-head {
   flex: none;
@@ -233,13 +258,43 @@ html, body {
   cursor: pointer; padding: 2px 6px; border-radius: var(--r-xs);
 }
 .icon-btn:hover { background: var(--subtle); }
+
+/* 头部帮助入口：☰ 只是移动端打开抽屉用，桌面端要藏；但「?」两端都需要。
+   原来它直接复用 .icon-btn，桌面端被 display:none 一并藏掉了 ——
+   之前用 JS 的 .click() 测过"入口可用"，其实按钮根本不可见。
+   用后代选择器提高优先级，压过 .icon-btn 与窄屏的 display:block。 */
+.chat-head .head-help {
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+  width: 24px; height: 24px;
+  padding: 0;
+  font-size: 12px; font-weight: 700;
+  color: var(--ink-faint);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.chat-head .head-help:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
 .chat-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .chat-title > span:first-child {
   font-size: 15px; font-weight: 620; letter-spacing: -.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .chat-sub { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
-.head-right { margin-left: auto; }
+/* 右侧是「模型名 + 帮助」，必须排成一行。
+   原来 .head-right 只是 margin-left:auto 的块，窄屏下 .icon-btn 被改成
+   display:block 就会把 ? 挤到第二行去；改成 flex 容器后两者始终同行。 */
+.head-right {
+  margin-left: auto;
+  display: flex; align-items: center; gap: var(--s2);
+  min-width: 0;
+}
 .head-model {
   font-size: 11px; color: var(--ink-faint);
   font-family: var(--mono);
@@ -337,22 +392,33 @@ html, body {
 @keyframes blink { 0%,60%,100% { opacity: .25; } 30% { opacity: 1; } }
 
 /* ============================ 欢迎页（空态，紧凑） ============================ */
-.welcome { max-width: 880px; margin: 0 auto; padding: var(--s6) var(--s5) var(--s5); }
+.welcome { max-width: 880px; margin: 0 auto; padding: var(--s5) var(--s5) var(--s6); }
 .welcome-inner { text-align: center; }
 .welcome-logo {
+  position: relative;
   width: 48px; height: 48px; margin: 0 auto var(--s4);
-  background: var(--ink);
+  background: linear-gradient(160deg, #35322C, var(--ink));
   color: #fff;
   border-radius: 14px;
   font-family: var(--serif);
   font-weight: 700; font-size: 17px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 6px 18px rgba(35,32,27,.16);
+  box-shadow: 0 1px 2px rgba(35,32,27,.18), 0 8px 20px rgba(35,32,27,.14);
 }
-.welcome h2 { font-size: 21px; font-weight: 650; letter-spacing: -.02em; margin-bottom: var(--s2); }
+/* 顶边一道高光，避免纯色方块在暖纸底上显得发死 */
+.welcome-logo::after {
+  content: ""; position: absolute; inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,.18), transparent 45%);
+}
+.welcome h2 {
+  font-size: 22px; font-weight: 650;
+  letter-spacing: -.022em; line-height: 1.35;
+  margin-bottom: var(--s2);
+}
 .welcome > .welcome-inner > p {
-  color: var(--ink-dim); font-size: 13.5px;
-  max-width: 560px; margin: 0 auto var(--s5);
+  color: var(--ink-dim); font-size: 13.5px; line-height: 1.8;
+  max-width: 560px; margin: 0 auto;
 }
 
 /* 能力点三栏：空态是评委的第一眼，先把"系统做了什么"讲清楚，
@@ -381,32 +447,62 @@ html, body {
 
 .welcome-demo { text-align: left; max-width: 660px; margin: 0 auto; }
 .welcome-demo-title {
+  display: flex; align-items: center; gap: var(--s3);
   font-family: var(--serif);
   font-size: 11px; color: var(--ink-faint);
-  letter-spacing: .12em; text-transform: uppercase;
-  text-align: center;
+  letter-spacing: .12em;
   margin-bottom: var(--s3);
 }
-.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+/* 两侧细线把「或直接从演示样本开始」做成一条分隔，比孤零零一行居中字更像版式 */
+.welcome-demo-title::before,
+.welcome-demo-title::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
+
+/* 演示卡：三层结构（标签+徽章 / 主题 / 描述贴底）。
+   原来把后端的 `01 · good · 二次函数` 整串塞进标题，必然 ellipsis 截断，
+   而且同行还要挤一个 PASS 徽章 —— 改为标签与主题分行，名字不再被裁。 */
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
 .demo-card {
+  display: flex; flex-direction: column;
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 13px 14px;
+  padding: 12px 14px 13px;
   cursor: pointer;
   font-family: inherit;
   box-shadow: var(--sh-1);
   transition: border-color .15s, box-shadow .15s, transform .12s var(--ease);
 }
-.demo-card:hover { border-color: var(--accent); box-shadow: var(--sh-2); transform: translateY(-1px); }
+.demo-card:hover { border-color: var(--accent); box-shadow: var(--sh-2); transform: translateY(-2px); }
 .demo-card:active { transform: none; }
-.demo-card-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: 5px; }
-.demo-card-name {
-  font-size: 13px; font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.demo-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s2);
+  margin-bottom: 9px;
 }
-.demo-card-desc { font-size: 11.5px; color: var(--ink-faint); line-height: 1.5; }
+.demo-card-tag {
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--ink-faint);
+}
+.demo-card-name {
+  display: block;
+  font-size: 14px; font-weight: 650; letter-spacing: -.01em;
+  line-height: 1.3;
+  margin-bottom: 5px;
+}
+/* margin-top:auto 让描述贴着卡底 —— 描述行数不同（1 行 vs 2 行）时三卡依然齐 */
+.demo-card-desc {
+  margin-top: auto;
+  font-size: 11.5px; color: var(--ink-faint); line-height: 1.55;
+}
 
 /* ============================ 报告卡片 ============================ */
 
@@ -463,7 +559,7 @@ html, body {
 }
 
 /* 分数是全场主角：衬线大字号 */
-.report-score-line { display: flex; align-items: baseline; gap: 10px; }
+.report-score-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .report-score-num {
   font-family: var(--serif);
   font-size: 40px; font-weight: 700; line-height: 1;
@@ -471,7 +567,26 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 .report-score-den { font-size: 13px; color: var(--ink-faint); }
-.report-verdict { font-size: 13px; color: var(--ink-dim); }
+/* 「加权总分」原先是跟分母挤在同一个 span 里（`/ 100 加权总分`），
+   混成一个视觉块；拆出来单独降一级，让度数关系一眼分清：分数 → 刻度 → 口径 */
+.report-score-label {
+  font-size: 11.5px; color: var(--ink-faint); letter-spacing: .02em;
+  padding-left: 2px;
+}
+/* 判定词跟判级同色。默认中性，由 .report-card 的判级类着色 ——
+   写死成 --good 会把 FAIL 卡的「不通过」也染成绿色。 */
+.report-verdict {
+  font-size: 12.5px; font-weight: 550;
+  padding-left: var(--s2);
+  color: var(--ink-dim);
+}
+.report-card.is-pass .report-verdict { color: var(--good); }
+.report-card.is-fail .report-verdict { color: var(--bad); }
+.report-card.is-ne   .report-verdict { color: var(--ne); }
+.report-verdict::before {
+  content: "·"; color: var(--border-strong);
+  margin-right: var(--s2); font-weight: 400;
+}
 .report-sub {
   font-size: 11.5px; color: var(--ink-faint);
   margin-top: 5px;
@@ -616,6 +731,54 @@ html, body {
 .chart-canvas.short { height: 200px; }
 .chart-canvas.xshort { height: 168px; }
 .chart-hint { font-size: 11.5px; color: var(--ink-faint); margin-top: var(--s2); }
+
+/* 总览：左「关键结论 + 维度速览」/ 右「雷达图」。
+   原来 .split 用 align-items:start，两卡各自按内容高 —— 结论少时左卡很矮，
+   右卡 260px 雷达撑着，视觉上像"没对齐"。这里改成等高：雷达框吃掉剩余高度，
+   左侧补一张「维度速览」把空间填成有用的信息（雷达给形状、速览给具体分值），
+   而不是留一片空白。只作用于总览，避免影响规则层那种「左图右 chip」的组合。 */
+.rpanel[data-p="overview"] .chart-grid.split { align-items: stretch; }
+.rpanel[data-p="overview"] .chart-grid.split > .chart-box { display: flex; flex-direction: column; }
+.rpanel[data-p="overview"] .chart-grid.split > .chart-box > .chart-canvas { flex: 1; min-height: 230px; }
+
+/* 维度速览：每维一行迷你五格条，按分值低→高排，短板顶到最上面 */
+.dim-mini { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--border); }
+.dim-mini-title {
+  display: flex; align-items: baseline; gap: var(--s2);
+  font-family: var(--serif);
+  font-size: 11px; letter-spacing: .12em; color: var(--accent);
+  margin-bottom: 9px;
+}
+.dim-mini-title::before { content: ""; width: 3px; height: 11px; background: var(--accent); border-radius: 2px; align-self: center; }
+.dim-mini-title > span { font-family: var(--sans); font-size: 10.5px; letter-spacing: .02em; color: var(--ink-faint); }
+.dim-mini-none {
+  font-size: 12px; color: var(--ink-faint); line-height: 1.6;
+  padding: 2px 0 1px;
+}
+.dim-mini-row { display: flex; align-items: center; gap: var(--s2); padding: 2px 0; }
+.dm-name {
+  flex: none; width: 92px;
+  font-size: 12px; color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dm-bar { flex: 1; display: flex; gap: 3px; }
+.dm-bar i {
+  flex: 1; height: 5px; border-radius: 2px;
+  background: var(--subtle);
+}
+/* 条形配色只按"档"给（好/中/差），同一档内不再区分 5 与 4 ——
+   长度本身已经在表达大小，再叠一层深浅会变成噪音。 */
+.dm-bar i.on.d5, .dm-bar i.on.d4 { background: var(--good); }
+.dm-bar i.on.d3 { background: var(--warn); }
+.dm-bar i.on.d2, .dm-bar i.on.d1 { background: var(--bad); }
+.dm-score {
+  flex: none; width: 14px; text-align: right;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dm-score.s5, .dm-score.s4 { color: var(--good); }
+.dm-score.s3 { color: var(--warn); }
+.dm-score.s2, .dm-score.s1 { color: var(--bad); }
 
 /* 旧版 stat-grid 保留兼容（部分面板仍用），但视觉收敛 */
 .stat-grid {
@@ -875,7 +1038,7 @@ html, body {
   max-height: 200px;
   padding: var(--s1) 0;
 }
-#textInput::placeholder { color: var(--ink-faint); }
+#textInput::placeholder { color: var(--ink-placeholder); }
 
 /* 卡内底条：只放「顺手就做」的操作，用一条淡虚线跟写作区分开 */
 .composer-bar {
@@ -977,6 +1140,8 @@ input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--accent);
   }
   .scrim.show { opacity: 1; pointer-events: auto; }
   .icon-btn { display: block; }
+  /* 窄屏给模型名上限，免得把「新评测」挤没（侧栏状态行也常驻显示同一个模型） */
+  .head-model { max-width: 118px; }
   .msg { padding: 0 14px; }
   .welcome { padding: var(--s5) 14px var(--s4); }
   /* 小屏：`.composer` 已在主样式里承担左右内边距，这里收窄即可 */
@@ -1021,22 +1186,44 @@ input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--accent);
 }
 .btn-help:hover { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
 
-/* ---- 欢迎页引导 ---- */
+/* ---- 欢迎页引导：空态里唯一的行动指引，不该长得像个 disabled 药丸 ----
+   原来是一枚淡靛蓝胶囊，视觉权重低于旁边的能力卡，反而没人点。
+   改成白底描边卡 + 主色问号图标 + 两行文案，hover 抬升。 */
 .welcome-guide {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin: var(--s4) auto 0;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: none;
-  border-radius: 999px;
-  padding: 8px var(--s4);
-  font-size: 12.5px; font-family: inherit;
+  display: flex; align-items: center; gap: 11px;
+  width: fit-content;
+  margin: var(--s5) auto;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r);
+  padding: 10px 15px 10px 11px;
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: background .15s, transform .15s;
+  box-shadow: var(--sh-1);
+  transition: border-color .15s, box-shadow .15s, background .15s, transform .15s var(--ease);
 }
-.welcome-guide:hover { background: var(--accent-line); }
-.welcome-guide-arrow { transition: transform .15s; }
-.welcome-guide:hover .welcome-guide-arrow { transform: translateX(2px); }
+.welcome-guide:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: var(--sh-2);
+  transform: translateY(-1px);
+}
+.guide-icon {
+  flex: none;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff;
+  border-radius: 8px;
+  font-family: var(--serif);
+  font-size: 14px; font-weight: 700; line-height: 1;
+}
+.guide-text { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.guide-text b { font-size: 13px; font-weight: 600; }
+.guide-text > span { font-size: 11.5px; color: var(--ink-faint); letter-spacing: .01em; }
+.welcome-guide-arrow { flex: none; color: var(--accent); transition: transform .15s; }
+.welcome-guide:hover .welcome-guide-arrow { transform: translateX(3px); }
 
 /* ---- 参数旁的小问号 / 行内链接 ---- */
 .info {

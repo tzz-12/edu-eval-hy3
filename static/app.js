@@ -83,6 +83,15 @@ const DEMO_DESC = {
   "03_bad_fake_socratic": "只有提问外壳、没有认知引导的伪启发",
 };
 
+// 演示卡的短名与标签。后端 label 是 `01 · good · 二次函数` 这种机器拼接串，
+// 直接铺在卡上会又长又截断；这里拆成「主题 + 设计意图」两层，
+// 让三张卡一眼能分辨（好样本 / 硬伤 / 软伤）。缺失时回退到 label 拆分。
+const DEMO_NAME = {
+  "01_good_二次函数": { name: "二次函数", tag: "好样本" },
+  "02_bad_formula": { name: "公式错误", tag: "硬伤" },
+  "03_bad_fake_socratic": { name: "伪启发", tag: "软伤" },
+};
+
 // ============== 状态 ==============
 let uid = 0;
 const charts = new Map();          // key → Chart 实例，重渲染时统一销毁
@@ -141,6 +150,13 @@ function destroyCharts(prefix) {
   bindEvents();
 })();
 
+// 后端加了新样本但前端还没配短名时的兜底：把 `04 · bad · xyz` 拆成 名称=04、标签=bad · xyz
+function demoFallback(s) {
+  const parts = String(s.label || "").split("·").map((x) => x.trim()).filter(Boolean);
+  const idx = parts.shift() || "";
+  return { name: idx || String(s.id || "样本"), tag: parts.join(" · ") || "样本" };
+}
+
 async function loadDemoSamples() {
   try {
     const d = await api("GET", "/api/demo-samples");
@@ -149,15 +165,18 @@ async function loadDemoSamples() {
       box.innerHTML = `<span class="hint">尚无演示样本，先运行 scripts/pregen_demo_reports.py</span>`;
       return;
     }
-    box.innerHTML = d.samples.map(s => `
+    box.innerHTML = d.samples.map(s => {
+      const meta = DEMO_NAME[s.id] || demoFallback(s);
+      return `
       <button class="demo-card" data-demo="${escHtml(s.id)}">
         <div class="demo-card-top">
-          <span class="demo-card-name">${escHtml(s.label)}</span>
+          <span class="demo-card-tag">${escHtml(meta.tag)}</span>
           <span class="badge-mini badge-${(s.admission || "NE").toLowerCase()}">${escHtml(s.admission || "—")}${s.total_score != null ? " " + Math.round(s.total_score) : ""}</span>
         </div>
-        <div class="demo-card-desc">${escHtml(DEMO_DESC[s.id] || "点击秒级加载，不消耗额度")}</div>
-      </button>
-    `).join("");
+        <b class="demo-card-name">${escHtml(meta.name)}</b>
+        <span class="demo-card-desc">${escHtml(DEMO_DESC[s.id] || "点击秒级加载，不消耗额度")}</span>
+      </button>`;
+    }).join("");
     $$("#demoButtons .demo-card").forEach(b =>
       b.addEventListener("click", () => runDemo(b.dataset.demo)));
   } catch {
@@ -244,10 +263,19 @@ function newChat() {
   updateCount(); autoGrow();
 }
 
+// 历史条数：给侧栏分区标签补一个计数，空列表时整个标签收起来
+function setConvCount(n) {
+  const el = $("#convCount");
+  if (el) el.textContent = n ? String(n) : "";
+  const head = document.querySelector(".conv-head");
+  if (head) head.classList.toggle("is-empty", !n);
+}
+
 async function loadConversations() {
   const box = $("#convList");
   try {
     const list = await api("GET", "/api/reports");
+    setConvCount(list.length);
     if (!list.length) {
       box.innerHTML = `
         <div class="conv-empty">
@@ -539,8 +567,9 @@ function reportCardHTML(r, cid) {
         </div>
         <div class="report-score-line">
           <span class="report-score-num">${total != null ? Number(total).toFixed(1) : "—"}</span>
-          <span class="report-score-den">/ 100 加权总分</span>
-          ${agg.verdict ? `<span class="report-verdict">· ${escHtml(agg.verdict)}</span>` : ""}
+          <span class="report-score-den">/ 100</span>
+          <span class="report-score-label">加权总分</span>
+          ${agg.verdict ? `<span class="report-verdict">${escHtml(agg.verdict)}</span>` : ""}
         </div>
         <div class="report-sub">${metaBits.map(m => escHtml(m)).join(" · ")}</div>
       </div>
@@ -618,15 +647,51 @@ function keyFindings(r) {
   return items.slice(0, 4);
 }
 
+/* 总览左侧的「维度速览」。
+   雷达图能给"形状"但读不出具体分值，补一列迷你五格条：按分值低→高排，
+   短板自然顶到最上面。这不是「维度详情」Tab 的重复——那里有锚点、证据、
+   仲裁理由，这里是摘要；也是为了让总览左右两栏等高后不留一片空白。 */
+function dimMiniHTML(r) {
+  const scores = r.scores || {};
+  const rows = [];
+  for (const id of DIM_ORDER) {
+    const v = scores[id];
+    if (!v || v.score == null) continue;
+    rows.push({ id, score: Math.max(0, Math.min(5, Math.round(Number(v.score)))) });
+  }
+  if (!rows.length) {
+    // 闸门拦下的报告不会产生任何维度分。与其留一块空白，不如把原因写出来。
+    return `
+    <div class="dim-mini">
+      <div class="dim-mini-title">维度得分</div>
+      <div class="dim-mini-none">未通过知识准入闸门，本次没有产生维度得分</div>
+    </div>`;
+  }
+  rows.sort((a, b) => a.score - b.score || (DIM_ORDER.indexOf(a.id) - DIM_ORDER.indexOf(b.id)));
+  return `
+  <div class="dim-mini">
+    <div class="dim-mini-title">维度得分<span>按低到高</span></div>
+    ${rows.map(d => `
+      <div class="dim-mini-row">
+        <span class="dm-name">${escHtml(d.id)} ${escHtml(DIM_SHORT[d.id] || "")}</span>
+        <span class="dm-bar">${[1, 2, 3, 4, 5].map(i =>
+          `<i class="${i <= d.score ? "on d" + d.score : ""}"></i>`).join("")}</span>
+        <b class="dm-score s${d.score}">${d.score}</b>
+      </div>`).join("")}
+  </div>`;
+}
+
 function keyFindingsHTML(r) {
+  const findings = keyFindings(r);
   return `
   <div class="key-findings">
     <div class="kf-title">关键结论</div>
-    ${keyFindings(r).map(it => `
+    ${findings.map(it => `
       <div class="kf-item kf-${it.level}">
         <span class="kf-mark">${it.mark}</span>
         <span class="kf-text">${escHtml(it.text)}</span>
       </div>`).join("")}
+    ${dimMiniHTML(r)}
   </div>`;
 }
 

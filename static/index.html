@@ -25,6 +25,10 @@
         <button id="helpBtn" class="btn-help">评测说明 · 维度与参数</button>
       </div>
 
+      <div class="conv-head">
+        <span>历史记录</span>
+        <span class="conv-count" id="convCount"></span>
+      </div>
       <div class="conv-list" id="convList">
         <div class="loading">加载中…</div>
       </div>
@@ -47,7 +51,7 @@
         </div>
         <div class="head-right">
           <span class="head-model" id="headModel"></span>
-          <button class="icon-btn" id="headHelpBtn" title="评测说明" aria-label="评测说明">?</button>
+          <button class="icon-btn head-help" id="headHelpBtn" title="评测说明" aria-label="评测说明">?</button>
         </div>
       </header>
 
@@ -61,7 +65,11 @@
                再按 8 个加权维度逐项打分，并用双采样自一致压住 LLM 打分的随机性。</p>
 
             <button class="welcome-guide" id="welcomeHelp">
-              第一次用？先看评测说明：评什么、怎么算、参数怎么选
+              <span class="guide-icon" aria-hidden="true">?</span>
+              <span class="guide-text">
+                <b>第一次用？先看评测说明</b>
+                <span>评什么 · 怎么算 · 参数怎么选</span>
+              </span>
               <span class="welcome-guide-arrow">→</span>
             </button>
 
