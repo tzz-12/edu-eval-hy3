@@ -286,13 +286,15 @@ async function loadConversations() {
       return;
     }
     box.innerHTML = list.map(r => {
-      const adm = (r.admission || "NE").toLowerCase();
+      // 与主面板同源逻辑：redline=true 时整个条目按 FAIL 上色
+      const admRaw = r.admission || "NE";
+      const adm = (r.redline ? "FAIL" : admRaw).toLowerCase();
       const score = r.total_score != null ? Math.round(r.total_score) + " 分" : "未出分";
       return `
       <button class="conv-item is-${adm}" data-id="${r.id}">
         <div class="conv-top">
           <span class="conv-name">${escHtml(r.file_name || "未命名")}</span>
-          <span class="badge-mini badge-${adm}">${escHtml(r.admission || "—")}</span>
+          <span class="badge-mini badge-${adm}">${escHtml(r.redline ? "FAIL" : (r.admission || "—"))}</span>
         </div>
         <div class="conv-meta">
           <span>${fmtTime(r.created_at)}</span>
@@ -534,6 +536,12 @@ async function runDemo(id) {
 function reportCardHTML(r, cid) {
   const agg = r.aggregation || {};
   const adm = r.admission || "NE";
+  // 红线触发比知识准入更严重：把"安全闸"覆盖在"知识闸"之上。
+  // 设计上 admission 只看 G0（知识），redline 是独立安全信号——
+  // 但视觉上若保留 PASS / 绿框，用户会以为只是小提醒。
+  // 让 `eff`（effective）专管颜色/标签，逻辑分支（FAIL 提示、是否出分等）
+  // 仍用 `adm`，保持后端语义稳定。
+  const eff = r.redline ? "FAIL" : adm;
   const total = agg.total_score;
   // 半圆环内的读数配色，与 drawGauge 的取色规则保持一致
   const gv = total != null ? Number(total) : null;
@@ -545,7 +553,8 @@ function reportCardHTML(r, cid) {
   const ds = r.dual_sample || {};
   const scoreCount = Object.keys(r.scores || {}).length;
 
-  const railCls = adm === "FAIL" ? "is-fail" : adm === "PASS" ? "is-pass" : "is-ne";
+  // 边框/标签配色用 eff：红线触发时直接 FAIL 红框 + "红线触发" 红徽并存
+  const railCls = eff === "FAIL" ? "is-fail" : eff === "PASS" ? "is-pass" : "is-ne";
 
   // 元信息行：文档名 / 年级 / 解析置信度。字段名在不同来源下不一致
   // （demo 报告用 _demo_source，实时评测用 file_name），都要兜住。
@@ -569,9 +578,9 @@ function reportCardHTML(r, cid) {
       <div class="report-head-left">
         <div class="report-pill-row">
           <span class="eyebrow">评测报告</span>
-          <span class="pill pill-${escHtml(adm)}">${escHtml(adm)}</span>
-          ${agg.grade ? `<span class="badge-mini badge-${adm === "FAIL" ? "fail" : "pass"}">${escHtml(agg.grade)}</span>` : ""}
-          ${r.redline ? `<span class="badge-mini badge-fail">红线触发</span>` : ""}
+          <span class="pill pill-${escHtml(eff)}">${escHtml(eff)}</span>
+          ${agg.grade ? `<span class="badge-mini badge-${eff === "FAIL" ? "fail" : "pass"}">${escHtml(agg.grade)}</span>` : ""}
+          ${r.redline ? `<span class="badge-mini badge-fail" title="${escHtml(agg.reason || "安全红线触发")}">红线触发</span>` : ""}
         </div>
         <div class="report-score-line">
           <span class="report-score-num">${total != null ? Number(total).toFixed(1) : "—"}</span>
@@ -721,7 +730,9 @@ function panelOverview(r, cid) {
 
   const reason = adm === "FAIL"
     ? `<div class="notice" style="margin-bottom:16px">知识红线（G0 · 维度2）未通过：${escHtml(agg.reason || r.rules?.g0_rule_verdict || "未通过知识准确性校验")}。评分已终止，其余维度不再出分。</div>`
-    : "";
+    : (r.redline
+        ? `<div class="notice" style="margin-bottom:16px">${escHtml(agg.reason || "安全红线触发：存在严重不适龄、违法违规或歧视等内容")}。评分已终止，其余维度不再出分。</div>`
+        : "");
 
   // 出分维度 / 权重覆盖 / KB 命中 / NE / 双采样 / 规则发现 已经在报告头下方的
   // 统计条里常驻，这里不再重复铺一遍指标块（同一组数字出现两次就是噪音）。
